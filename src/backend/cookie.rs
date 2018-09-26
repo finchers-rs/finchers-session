@@ -1,12 +1,10 @@
-extern crate cookie as cookie;
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use finchers::error::Error;
 use finchers::input::Input;
 
-use self::cookie::{Cookie, CookieJar, Key};
+use cookie::{Cookie, CookieJar, Key};
 use futures::future;
 use serde_json;
 use std::fmt;

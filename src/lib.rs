@@ -15,47 +15,28 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![cfg_attr(feature = "strict", doc(test(attr(deny(warnings)))))]
 
+extern crate cookie;
 #[macro_use]
 extern crate failure;
 extern crate finchers;
 extern crate futures;
+extern crate redis;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
 
+pub mod backend;
+
+// ====
+
 use finchers::endpoint::{Context, Endpoint, EndpointResult};
 use finchers::error::Error;
-use finchers::input::Input;
 
 use futures::{Future, Poll};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-pub mod cookie;
-pub mod in_memory;
-pub mod redis;
-
-pub trait RawSession {
-    type WriteError: Into<Error>;
-    type WriteFuture: Future<Item = (), Error = Self::WriteError>;
-
-    fn get(&self, key: &str) -> Option<&str>;
-    fn set(&mut self, key: &str, value: String);
-    fn remove(&mut self, key: &str);
-    fn clear(&mut self);
-
-    fn write(self, input: &mut Input) -> Self::WriteFuture;
-}
-
-pub trait SessionBackend {
-    type Session: RawSession;
-    type ReadError: Into<Error>;
-    type ReadFuture: Future<Item = Self::Session, Error = Self::ReadError>;
-
-    fn read(&self, input: &mut Input) -> Self::ReadFuture;
-}
-
-// ====
+use backend::{RawSession, SessionBackend};
 
 pub fn session<S: SessionBackend>(backend: S) -> SessionEndpoint<S> {
     SessionEndpoint { backend }

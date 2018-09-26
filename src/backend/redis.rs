@@ -1,19 +1,16 @@
-extern crate cookie;
-extern crate redis;
-extern crate uuid;
-
-use self::cookie::Cookie;
-use self::redis::async::Connection;
-use self::redis::Client;
-use self::uuid::Uuid;
-
 use finchers;
 use finchers::error::Error;
 use finchers::input::Input;
 
 use futures::future;
-use futures::Future;
+use futures::{Future, IntoFuture};
 use std::collections::BTreeMap;
+
+use cookie::Cookie;
+use redis;
+use redis::async::Connection;
+use redis::Client;
+use uuid::Uuid;
 
 use super::{RawSession, SessionBackend};
 
@@ -27,7 +24,7 @@ impl RedisSessionBackend {
         RedisSessionBackend { client }
     }
 
-    pub fn get_session_id(&self, input: &mut Input) -> Result<Option<Uuid>, Error> {
+    fn get_session_id(&self, input: &mut Input) -> Result<Option<Uuid>, Error> {
         if let Some(cookie) = input.cookies()?.get("session-id") {
             let session_id: Uuid = cookie
                 .value()
@@ -116,12 +113,21 @@ impl RawSession for RedisSession {
 
     fn write(self, input: &mut Input) -> Self::WriteFuture {
         let session_id = self.session_id.unwrap_or_else(Uuid::new_v4);
-        let write_future = redis::cmd("SET")
-            .arg(session_id.to_string())
-            .arg(self.values)
-            .query_async(self.conn)
-            .map_err(finchers::error::fail)
-            .and_then(|(conn, ())| Ok(()));
+        let cookie = Cookie::new("session-id", session_id.to_string());
+
+        let write_future = input
+            .cookies()
+            .map(|jar| jar.add(cookie))
+            .into_future()
+            .and_then(move |_| {
+                redis::cmd("SET")
+                    .arg(session_id.to_string())
+                    .arg(self.values)
+                    .query_async(self.conn)
+                    .map_err(finchers::error::fail)
+                    .and_then(|(_conn, ())| Ok(()))
+            });
+
         Box::new(write_future)
     }
 }

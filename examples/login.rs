@@ -11,7 +11,7 @@ extern crate serde;
 
 use finchers::input::query::Serde;
 use finchers::prelude::*;
-use finchers_session::in_memory::InMemorySessionBackend;
+use finchers_session::backend::in_memory::InMemorySessionBackend;
 use finchers_session::{session, Session};
 
 use futures::prelude::*;

@@ -1,5 +1,3 @@
-extern crate cookie;
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -7,7 +5,7 @@ use finchers;
 use finchers::error::Error;
 use finchers::input::Input;
 
-use self::cookie::Cookie;
+use cookie::Cookie;
 use futures::future;
 use uuid::Uuid;
 
