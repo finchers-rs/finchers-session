@@ -8,7 +8,6 @@ use finchers::input::Input;
 
 use self::cookie::{Cookie, CookieJar, Key};
 use futures::future;
-use http::Response;
 use serde_json;
 use std::fmt;
 
@@ -61,7 +60,7 @@ impl Inner {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CookieSessionBackend {
     inner: Arc<Inner>,
 }
@@ -88,10 +87,10 @@ impl CookieSessionBackend {
 
 impl SessionBackend for CookieSessionBackend {
     type Session = CookieSession;
-    type Error = Error;
-    type Future = future::FutureResult<Self::Session, Self::Error>;
+    type ReadError = Error;
+    type ReadFuture = future::FutureResult<Self::Session, Self::ReadError>;
 
-    fn read(&self, input: &mut Input) -> Self::Future {
+    fn read(&self, input: &mut Input) -> Self::ReadFuture {
         future::result(self.inner.read_values(input).map(|values| CookieSession {
             inner: self.inner.clone(),
             values,
@@ -107,7 +106,21 @@ pub struct CookieSession {
     modified: bool,
 }
 
+impl CookieSession {
+    fn write_impl(self, input: &mut Input) -> Result<(), Error> {
+        if self.modified {
+            let value = serde_json::to_string(&self.values).map_err(::finchers::error::fail)?;
+            let jar = input.cookies()?;
+            self.inner.write_value(value, jar);
+        }
+        Ok(())
+    }
+}
+
 impl RawSession for CookieSession {
+    type WriteError = Error;
+    type WriteFuture = future::FutureResult<(), Self::WriteError>;
+
     fn get(&self, key: &str) -> Option<&str> {
         self.values.get(key).map(|s| s.as_str())
     }
@@ -127,12 +140,7 @@ impl RawSession for CookieSession {
         self.modified = true;
     }
 
-    fn write<T>(self, input: &mut Input, _output: &mut Response<T>) -> Result<(), Error> {
-        if self.modified {
-            let value = serde_json::to_string(&self.values).map_err(::finchers::error::fail)?;
-            let jar = input.cookies()?;
-            self.inner.write_value(value, jar);
-        }
-        Ok(())
+    fn write(self, input: &mut Input) -> Self::WriteFuture {
+        future::result(self.write_impl(input))
     }
 }

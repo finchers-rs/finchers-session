@@ -17,37 +17,37 @@
 
 extern crate finchers;
 extern crate futures;
-extern crate http;
 extern crate serde;
 extern crate serde_json;
 
 use finchers::endpoint::{Context, Endpoint, EndpointResult};
 use finchers::error::Error;
 use finchers::input::Input;
-use finchers::output::{Output, OutputContext};
 
 use futures::{Future, Poll};
-use http::Response;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 pub mod cookie;
 
 pub trait RawSession {
+    type WriteError: Into<Error>;
+    type WriteFuture: Future<Item = (), Error = Self::WriteError>;
+
     fn get(&self, key: &str) -> Option<&str>;
     fn set(&mut self, key: &str, value: String);
     fn remove(&mut self, key: &str);
     fn clear(&mut self);
 
-    fn write<T>(self, input: &mut Input, output: &mut Response<T>) -> Result<(), Error>;
+    fn write(self, input: &mut Input) -> Self::WriteFuture;
 }
 
 pub trait SessionBackend {
     type Session: RawSession;
-    type Error: Into<Error>;
-    type Future: Future<Item = Self::Session, Error = Self::Error>;
+    type ReadError: Into<Error>;
+    type ReadFuture: Future<Item = Self::Session, Error = Self::ReadError>;
 
-    fn read(&self, input: &mut Input) -> Self::Future;
+    fn read(&self, input: &mut Input) -> Self::ReadFuture;
 }
 
 // ====
@@ -56,7 +56,7 @@ pub fn session<S: SessionBackend>(backend: S) -> SessionEndpoint<S> {
     SessionEndpoint { backend }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct SessionEndpoint<S> {
     backend: S,
 }
@@ -66,7 +66,7 @@ where
     S: SessionBackend + 'a,
 {
     type Output = (Session<S::Session>,);
-    type Future = SessionFuture<S::Future>;
+    type Future = SessionFuture<S::ReadFuture>;
 
     fn apply(&'a self, cx: &mut Context<'_>) -> EndpointResult<Self::Future> {
         Ok(SessionFuture {
@@ -135,35 +135,7 @@ impl<S: RawSession> Session<S> {
         self.raw.clear();
     }
 
-    pub fn finish<T>(self, output: T) -> SessionOutput<T, S>
-    where
-        T: Output,
-    {
-        SessionOutput {
-            output,
-            raw: self.raw,
-        }
-    }
-}
-
-#[must_use]
-#[derive(Debug)]
-pub struct SessionOutput<T, S> {
-    output: T,
-    raw: S,
-}
-
-impl<T, S> Output for SessionOutput<T, S>
-where
-    T: Output,
-    S: RawSession,
-{
-    type Body = T::Body;
-    type Error = Error;
-
-    fn respond(self, cx: &mut OutputContext) -> Result<Response<Self::Body>, Self::Error> {
-        let mut response = self.output.respond(cx).map_err(Into::into)?;
-        self.raw.write(cx.input(), &mut response)?;
-        Ok(response)
+    pub fn finish(self) -> impl Future<Item = (), Error = Error> {
+        finchers::input::with_get_cx(|input| self.raw.write(input)).map_err(Into::into)
     }
 }
