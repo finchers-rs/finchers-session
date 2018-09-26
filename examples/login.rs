@@ -29,7 +29,9 @@ impl Login {
 fn main() {
     pretty_env_logger::init();
 
-    let backend = CookieSessionBackend::signed(b"very-secret");
+    const SECRET: &str = "this-is-very-very-secret-master-key";
+
+    let backend = CookieSessionBackend::signed(SECRET);
     let session = session(backend);
 
     let greet = path!(@get /)
@@ -46,7 +48,7 @@ fn main() {
                 )),
                 _ => Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
-                    .header("content-type", "text/plain; charset=utf-8")
+                    .header("content-type", "text/html; charset=utf-8")
                     .body("<a href=\"/login\">Log in</a>".into())
                     .unwrap(),
             };
@@ -114,7 +116,7 @@ fn redirect_to(location: &str) -> Response<()> {
 
 fn html<T>(body: T) -> Response<T> {
     Response::builder()
-        .header("content-type", "text/plain; charset=utf-8")
+        .header("content-type", "text/html; charset=utf-8")
         .body(body)
         .unwrap()
 }
