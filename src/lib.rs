@@ -33,6 +33,7 @@ use serde::Serialize;
 
 pub mod cookie;
 pub mod in_memory;
+pub mod redis;
 
 pub trait RawSession {
     type WriteError: Into<Error>;
