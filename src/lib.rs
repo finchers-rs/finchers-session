@@ -15,10 +15,13 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![cfg_attr(feature = "strict", doc(test(attr(deny(warnings)))))]
 
+#[macro_use]
+extern crate failure;
 extern crate finchers;
 extern crate futures;
 extern crate serde;
 extern crate serde_json;
+extern crate uuid;
 
 use finchers::endpoint::{Context, Endpoint, EndpointResult};
 use finchers::error::Error;
@@ -29,6 +32,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 pub mod cookie;
+pub mod in_memory;
 
 pub trait RawSession {
     type WriteError: Into<Error>;

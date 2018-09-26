@@ -11,7 +11,7 @@ extern crate serde;
 
 use finchers::input::query::Serde;
 use finchers::prelude::*;
-use finchers_session::cookie::CookieSessionBackend;
+use finchers_session::in_memory::InMemorySessionBackend;
 use finchers_session::{session, Session};
 
 use futures::prelude::*;
@@ -29,9 +29,7 @@ impl Login {
 fn main() {
     pretty_env_logger::init();
 
-    const SECRET: &str = "this-is-very-very-secret-master-key";
-
-    let backend = CookieSessionBackend::signed(SECRET);
+    let backend = InMemorySessionBackend::default();
     let session = session(backend);
 
     let greet = path!(@get /)
