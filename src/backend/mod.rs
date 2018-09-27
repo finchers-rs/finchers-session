@@ -1,3 +1,7 @@
+#![allow(missing_docs)]
+
+//! The definition of backends.
+
 pub mod cookie;
 pub mod in_memory;
 #[cfg(feature = "redis")]
