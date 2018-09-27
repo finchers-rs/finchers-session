@@ -23,7 +23,7 @@ matrix:
         - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test
+        - cargo test --all-features
         - cargo fmt -- --check
         - if [[ "${TRAVIS_PULL_REQUEST_BRANCH:-}" = release-* ]]; then cargo package; fi
 
@@ -32,14 +32,14 @@ matrix:
         - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test
+        - cargo test --all-features
 
     - rust: nightly
       before_script:
         - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test
+        - cargo test --all-features
 
     - rust: stable
       env: DEPLOY_API_DOC
@@ -47,7 +47,7 @@ matrix:
       script:
         - rm -rf target/doc
         - cargo update
-        - cargo doc --no-deps
+        - cargo doc --all-features --no-deps
         - rm -f target/doc/.lock
         - echo '<meta http-equiv="refresh" content="0;URL=finchers_session/index.html">' > target/doc/index.html
       deploy:
