@@ -6,6 +6,9 @@ use finchers::error::Error;
 use finchers::input::Input;
 use futures::Future;
 
+use std::rc::Rc;
+use std::sync::Arc;
+
 pub trait RawSession {
     type WriteError: Into<Error>;
     type WriteFuture: Future<Item = (), Error = Self::WriteError>;
@@ -24,4 +27,37 @@ pub trait SessionBackend {
     type ReadFuture: Future<Item = Self::Session, Error = Self::ReadError>;
 
     fn read(&self, input: &mut Input) -> Self::ReadFuture;
+}
+
+impl<T: SessionBackend> SessionBackend for Box<T> {
+    type Session = T::Session;
+    type ReadError = T::ReadError;
+    type ReadFuture = T::ReadFuture;
+
+    #[inline]
+    fn read(&self, input: &mut Input) -> Self::ReadFuture {
+        (**self).read(input)
+    }
+}
+
+impl<T: SessionBackend> SessionBackend for Rc<T> {
+    type Session = T::Session;
+    type ReadError = T::ReadError;
+    type ReadFuture = T::ReadFuture;
+
+    #[inline]
+    fn read(&self, input: &mut Input) -> Self::ReadFuture {
+        (**self).read(input)
+    }
+}
+
+impl<T: SessionBackend> SessionBackend for Arc<T> {
+    type Session = T::Session;
+    type ReadError = T::ReadError;
+    type ReadFuture = T::ReadFuture;
+
+    #[inline]
+    fn read(&self, input: &mut Input) -> Self::ReadFuture {
+        (**self).read(input)
+    }
 }
