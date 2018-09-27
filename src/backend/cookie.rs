@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use finchers::error::Error;
 use finchers::input::Input;
 
 use cookie::{Cookie, CookieJar, Key};
 use futures::future;
-use serde_json;
 use std::fmt;
+use std::sync::Arc;
 
 use super::{RawSession, SessionBackend};
 
@@ -33,19 +30,15 @@ impl fmt::Debug for Inner {
 }
 
 impl Inner {
-    fn read_values(&self, input: &mut Input) -> Result<HashMap<String, String>, Error> {
+    fn read_value(&self, input: &mut Input) -> Result<Option<String>, Error> {
         let cookies = input.cookies()?;
         let cookie_opt = match self.security {
             Security::Signed => cookies.signed(&self.key).get(&self.name),
             Security::Private => cookies.private(&self.key).get(&self.name),
         };
         match cookie_opt {
-            Some(cookie) => {
-                let values =
-                    serde_json::from_str(cookie.value()).map_err(::finchers::error::bad_request)?;
-                Ok(values)
-            }
-            None => Ok(HashMap::new()),
+            Some(cookie) => Ok(Some(cookie.value().to_string())),
+            None => Ok(None),
         }
     }
 
@@ -54,6 +47,14 @@ impl Inner {
         match self.security {
             Security::Signed => jar.signed(&self.key).add(cookie),
             Security::Private => jar.private(&self.key).add(cookie),
+        }
+    }
+
+    fn remove_value(&self, jar: &mut CookieJar) {
+        let cookie = Cookie::named(self.name.clone());
+        match self.security {
+            Security::Signed => jar.signed(&self.key).remove(cookie),
+            Security::Private => jar.private(&self.key).remove(cookie),
         }
     }
 }
@@ -89,10 +90,9 @@ impl SessionBackend for CookieSessionBackend {
     type ReadFuture = future::FutureResult<Self::Session, Self::ReadError>;
 
     fn read(&self, input: &mut Input) -> Self::ReadFuture {
-        future::result(self.inner.read_values(input).map(|values| CookieSession {
+        future::result(self.inner.read_value(input).map(|value| CookieSession {
             inner: self.inner.clone(),
-            values,
-            modified: false,
+            value,
         }))
     }
 }
@@ -100,16 +100,16 @@ impl SessionBackend for CookieSessionBackend {
 #[derive(Debug)]
 pub struct CookieSession {
     inner: Arc<Inner>,
-    values: HashMap<String, String>,
-    modified: bool,
+    value: Option<String>,
 }
 
 impl CookieSession {
     fn write_impl(self, input: &mut Input) -> Result<(), Error> {
-        if self.modified {
-            let value = serde_json::to_string(&self.values).map_err(::finchers::error::fail)?;
-            let jar = input.cookies()?;
+        let jar = input.cookies()?;
+        if let Some(value) = self.value {
             self.inner.write_value(value, jar);
+        } else {
+            self.inner.remove_value(jar);
         }
         Ok(())
     }
@@ -119,23 +119,16 @@ impl RawSession for CookieSession {
     type WriteError = Error;
     type WriteFuture = future::FutureResult<(), Self::WriteError>;
 
-    fn get(&self, key: &str) -> Option<&str> {
-        self.values.get(key).map(|s| s.as_str())
+    fn get(&self) -> Option<&str> {
+        self.value.as_ref().map(|s| s.as_str())
     }
 
-    fn set(&mut self, key: &str, value: String) {
-        self.values.insert(key.to_owned(), value);
-        self.modified = true;
+    fn set(&mut self, value: String) {
+        self.value = Some(value);
     }
 
-    fn remove(&mut self, key: &str) {
-        self.values.remove(key);
-        self.modified = true;
-    }
-
-    fn clear(&mut self) {
-        self.values.clear();
-        self.modified = true;
+    fn remove(&mut self) {
+        self.value = None;
     }
 
     fn write(self, input: &mut Input) -> Self::WriteFuture {

@@ -2,7 +2,6 @@ use finchers;
 use finchers::error::Error;
 use finchers::input::Input;
 
-use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,7 +12,6 @@ use futures::{Future, Poll};
 use redis;
 use redis::async::Connection;
 use redis::Client;
-use serde_json;
 use uuid::Uuid;
 
 use super::{RawSession, SessionBackend};
@@ -115,21 +113,17 @@ impl SessionBackend for RedisSessionBackend {
                         .map_err(finchers::error::fail)
                         .and_then(move |(conn, value)| {
                             if let Some(value) = value {
-                                let values =
-                                    serde_json::from_str(&value).map_err(finchers::error::fail)?;
                                 Ok(RedisSession {
                                     conn,
                                     session_id: Some(id),
-                                    values,
-                                    mode: WriteMode::Unmodified,
+                                    value: Some(value),
                                     config,
                                 })
                             } else {
                                 Ok(RedisSession {
                                     conn,
                                     session_id: None,
-                                    values: BTreeMap::new(),
-                                    mode: WriteMode::Unmodified,
+                                    value: None,
                                     config,
                                 })
                             }
@@ -139,8 +133,7 @@ impl SessionBackend for RedisSessionBackend {
                     let future = future::ok(RedisSession {
                         conn,
                         session_id: None,
-                        values: BTreeMap::new(),
-                        mode: WriteMode::Unmodified,
+                        value: None,
                         config,
                     });
                     Box::new(future) as Box<dyn Future<Item = RedisSession, Error = Error> + Send>
@@ -151,20 +144,12 @@ impl SessionBackend for RedisSessionBackend {
     }
 }
 
-#[derive(Debug)]
-enum WriteMode {
-    Unmodified,
-    Modified,
-    Cleared,
-}
-
 #[allow(missing_docs)]
 pub struct RedisSession {
     conn: Connection,
     config: Arc<RedisSessionConfig>,
     session_id: Option<Uuid>,
-    values: BTreeMap<String, String>,
-    mode: WriteMode,
+    value: Option<String>,
 }
 
 impl fmt::Debug for RedisSession {
@@ -172,8 +157,7 @@ impl fmt::Debug for RedisSession {
         f.debug_struct("RedisSession")
             .field("config", &self.config)
             .field("session_id", &self.session_id)
-            .field("values", &self.values)
-            .field("mode", &self.mode)
+            .field("value", &self.value)
             .finish()
     }
 }
@@ -182,23 +166,16 @@ impl RawSession for RedisSession {
     type WriteError = Error;
     type WriteFuture = WriteFuture;
 
-    fn get(&self, key: &str) -> Option<&str> {
-        self.values.get(key).map(|s| s.as_str())
+    fn get(&self) -> Option<&str> {
+        self.value.as_ref().map(|s| s.as_ref())
     }
 
-    fn set(&mut self, key: &str, value: String) {
-        self.values.insert(key.to_owned(), value);
-        self.mode = WriteMode::Modified;
+    fn set(&mut self, value: String) {
+        self.value = Some(value);
     }
 
-    fn remove(&mut self, key: &str) {
-        self.values.remove(key);
-        self.mode = WriteMode::Modified;
-    }
-
-    fn clear(&mut self) {
-        self.values.clear();
-        self.mode = WriteMode::Cleared;
+    fn remove(&mut self) {
+        self.value = None;
     }
 
     fn write(self, input: &mut Input) -> Self::WriteFuture {
@@ -206,29 +183,29 @@ impl RawSession for RedisSession {
             conn,
             config,
             session_id,
-            values,
-            mode,
+            value,
         } = self;
 
-        let session_id = session_id.unwrap_or_else(Uuid::new_v4);
-
-        match input.cookies() {
-            Ok(jar) => {
-                let cookie = Cookie::new(config.cookie_name.to_string(), session_id.to_string());
-                jar.add(cookie)
+        match (session_id, value) {
+            (Some(session_id), None) => {
+                match input.cookies() {
+                    Ok(jar) => jar.remove(Cookie::named(config.cookie_name.to_string())),
+                    Err(err) => return WriteFuture::failed(err),
+                }
+                let redis_key = config.key_name(&session_id);
+                WriteFuture::cmd(conn, redis::cmd("DEL").arg(redis_key))
             }
-            Err(err) => return WriteFuture::failed(err),
-        }
+            (session_id, Some(value)) => {
+                let session_id = session_id.unwrap_or_else(Uuid::new_v4);
+                match input.cookies() {
+                    Ok(jar) => jar.add(Cookie::new(
+                        config.cookie_name.to_string(),
+                        session_id.to_string(),
+                    )),
+                    Err(err) => return WriteFuture::failed(err),
+                }
+                let redis_key = config.key_name(&session_id);
 
-        let redis_key = config.key_name(&session_id);
-
-        let value = match serde_json::to_string(&values) {
-            Ok(value) => value,
-            Err(err) => return WriteFuture::failed(finchers::error::fail(err)),
-        };
-
-        match mode {
-            WriteMode::Modified => {
                 if let Some(timeout) = config.timeout {
                     WriteFuture::cmd(
                         conn,
@@ -241,8 +218,7 @@ impl RawSession for RedisSession {
                     WriteFuture::cmd(conn, redis::cmd("SET").arg(redis_key).arg(value))
                 }
             }
-            WriteMode::Cleared => WriteFuture::cmd(conn, redis::cmd("DEL").arg(redis_key)),
-            _ => WriteFuture::no_op(),
+            (None, None) => WriteFuture::no_op(),
         }
     }
 }

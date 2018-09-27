@@ -23,10 +23,6 @@ struct Login {
     username: String,
 }
 
-impl Login {
-    const KEY: &'static str = "logged_in_user";
-}
-
 fn main() {
     pretty_env_logger::init();
 
@@ -42,7 +38,7 @@ fn main() {
     let greet = path!(@get /)
         .and(session.clone())
         .and_then(|session: Session<_>| {
-            let response = match session.get::<Login>(Login::KEY) {
+            let response = match session.get::<Login>() {
                 Ok(Some(login)) => html(format!(
                     "Hello, {}! <br />\n\
                      <form method=\"post\" action=\"/logout\">\n\
@@ -63,7 +59,7 @@ fn main() {
     let login = path!(@get /"login"/)
         .and(session.clone())
         .and_then(|session: Session<_>| {
-            let response = match session.get::<Login>(Login::KEY) {
+            let response = match session.get::<Login>() {
                 Ok(Some(_login)) => redirect_to("/").map(|_| ""),
                 _ => html(
                     "login form\n\
@@ -87,12 +83,9 @@ fn main() {
             .and(endpoints::body::urlencoded().map(Serde::into_inner))
             .and_then(|mut session: Session<_>, form: Form| {
                 session
-                    .set(
-                        Login::KEY,
-                        Login {
-                            username: form.username,
-                        },
-                    ).into_future()
+                    .set(Login {
+                        username: form.username,
+                    }).into_future()
                     .and_then(move |()| session.finish().map(|_| redirect_to("/")))
             })
     };
@@ -101,7 +94,7 @@ fn main() {
         path!(@post /"logout"/)
             .and(session.clone())
             .and_then(|mut session: Session<_>| {
-                session.clear();
+                session.remove();
                 session.finish().map(|_| redirect_to("/"))
             });
 

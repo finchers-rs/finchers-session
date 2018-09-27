@@ -5,7 +5,7 @@
 // released
 //#![doc(html_root_url = "https://docs.rs/finchers-session/0.1.0")]
 #![warn(
-    missing_docs,
+    // missing_docs,
     missing_debug_implementations,
     nonstandard_style,
     rust_2018_idioms,
@@ -93,11 +93,12 @@ pub struct Session<S: RawSession> {
 }
 
 impl<S: RawSession> Session<S> {
-    pub fn get<T>(&self, key: &str) -> Result<Option<T>, Error>
+    /// Get the session value if available.
+    pub fn get<T>(&self) -> Result<Option<T>, Error>
     where
         T: DeserializeOwned,
     {
-        if let Some(value) = self.raw.get(key) {
+        if let Some(value) = self.raw.get() {
             serde_json::from_str(&value)
                 .map(Some)
                 .map_err(finchers::error::bad_request)
@@ -106,21 +107,19 @@ impl<S: RawSession> Session<S> {
         }
     }
 
-    pub fn set<T>(&mut self, key: &str, value: T) -> Result<(), Error>
+    /// Set the session value.
+    pub fn set<T>(&mut self, value: T) -> Result<(), Error>
     where
         T: Serialize,
     {
         let value = serde_json::to_string(&value).map_err(finchers::error::fail)?;
-        self.raw.set(key, value);
+        self.raw.set(value);
         Ok(())
     }
 
-    pub fn remove(&mut self, key: &str) {
-        self.raw.remove(key);
-    }
-
-    pub fn clear(&mut self) {
-        self.raw.clear();
+    /// Annotates to remove session value to the backend.
+    pub fn remove(&mut self) {
+        self.raw.remove();
     }
 
     pub fn finish(self) -> impl Future<Item = (), Error = Error> {

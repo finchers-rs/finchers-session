@@ -10,18 +10,18 @@ use futures::Future;
 use std::rc::Rc;
 use std::sync::Arc;
 
+#[allow(missing_docs)]
 pub trait RawSession {
     type WriteError: Into<Error>;
     type WriteFuture: Future<Item = (), Error = Self::WriteError>;
 
-    fn get(&self, key: &str) -> Option<&str>;
-    fn set(&mut self, key: &str, value: String);
-    fn remove(&mut self, key: &str);
-    fn clear(&mut self);
-
+    fn get(&self) -> Option<&str>;
+    fn set(&mut self, value: String);
+    fn remove(&mut self);
     fn write(self, input: &mut Input) -> Self::WriteFuture;
 }
 
+#[allow(missing_docs)]
 pub trait SessionBackend {
     type Session: RawSession;
     type ReadError: Into<Error>;
@@ -63,8 +63,8 @@ impl<T: SessionBackend> SessionBackend for Arc<T> {
     }
 }
 
-#[cfg(feature = "redis")]
 /// Create a session backend which uses the specified Redis client.
+#[cfg(feature = "redis")]
 pub fn redis(client: ::redis::Client) -> self::redis::RedisSessionBackend {
     self::redis::RedisSessionBackend::new(client)
 }
