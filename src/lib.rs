@@ -20,10 +20,12 @@ extern crate cookie;
 extern crate failure;
 extern crate finchers;
 extern crate futures;
-extern crate redis;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
+
+#[cfg(feature = "redis")]
+extern crate redis;
 
 pub mod backend;
 

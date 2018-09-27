@@ -16,6 +16,7 @@ use finchers_session::{session, Session};
 
 use futures::prelude::*;
 use http::{Response, StatusCode};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Login {
@@ -29,8 +30,14 @@ impl Login {
 fn main() {
     pretty_env_logger::init();
 
+    // Uses in memory database backend:
     let backend = InMemorySessionBackend::default();
-    let session = session(backend);
+
+    // Uses redis backend:
+    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
+    // let backend = finchers_session::backend::redis(client);
+
+    let session = Arc::new(session(backend));
 
     let greet = path!(@get /)
         .and(session.clone())

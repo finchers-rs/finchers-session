@@ -1,5 +1,6 @@
 pub mod cookie;
 pub mod in_memory;
+#[cfg(feature = "redis")]
 pub mod redis;
 
 use finchers::error::Error;
@@ -60,4 +61,10 @@ impl<T: SessionBackend> SessionBackend for Arc<T> {
     fn read(&self, input: &mut Input) -> Self::ReadFuture {
         (**self).read(input)
     }
+}
+
+#[cfg(feature = "redis")]
+/// Create a session backend which uses the specified Redis client.
+pub fn redis(client: ::redis::Client) -> self::redis::RedisSessionBackend {
+    self::redis::RedisSessionBackend::new(client)
 }
