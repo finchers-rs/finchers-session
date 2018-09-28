@@ -5,9 +5,6 @@
 
 Session support for Finchers.
 
-# Status
-WIP
-
 # Documentation
 * [API Documentation (master)](https://finchers-rs.github.io/finchers-session)
 
