@@ -22,6 +22,7 @@ extern crate finchers;
 extern crate futures;
 extern crate serde;
 extern crate serde_json;
+extern crate time;
 extern crate uuid;
 
 #[cfg(feature = "redis")]
