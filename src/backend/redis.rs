@@ -2,6 +2,7 @@ use finchers;
 use finchers::error::Error;
 use finchers::input::Input;
 
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,7 +20,7 @@ use super::{RawSession, SessionBackend};
 #[derive(Debug)]
 struct RedisSessionConfig {
     key_prefix: String,
-    cookie_name: String,
+    cookie_name: Cow<'static, str>,
     timeout: Option<Duration>,
 }
 
@@ -53,8 +54,8 @@ impl RedisSessionBackend {
         RedisSessionBackend {
             client,
             config: Arc::new(RedisSessionConfig {
-                key_prefix: "finchers-esssion".into(),
-                cookie_name: "finchers-session-id".into(),
+                key_prefix: "finchers-sesssion".into(),
+                cookie_name: "session-id".into(),
                 timeout: None,
             }),
         }
@@ -68,16 +69,16 @@ impl RedisSessionBackend {
     /// to Redis.
     ///
     /// The default value is "finchers-session"
-    pub fn key_prefix(mut self, prefix: impl AsRef<str>) -> RedisSessionBackend {
-        self.config_mut().key_prefix = prefix.as_ref().into();
+    pub fn key_prefix(mut self, prefix: impl Into<String>) -> RedisSessionBackend {
+        self.config_mut().key_prefix = prefix.into();
         self
     }
 
     /// Set the name of Cookie entry which stores the session id.
     ///
-    /// The default value is "finchers-session-id"
-    pub fn cookie_name(mut self, name: impl AsRef<str>) -> RedisSessionBackend {
-        self.config_mut().cookie_name = name.as_ref().into();
+    /// The default value is "session-id"
+    pub fn cookie_name(mut self, name: impl Into<Cow<'static, str>>) -> RedisSessionBackend {
+        self.config_mut().cookie_name = name.into();
         self
     }
 
@@ -189,7 +190,7 @@ impl RawSession for RedisSession {
         match (session_id, value) {
             (Some(session_id), None) => {
                 match input.cookies() {
-                    Ok(jar) => jar.remove(Cookie::named(config.cookie_name.to_string())),
+                    Ok(jar) => jar.remove(Cookie::named(config.cookie_name.clone())),
                     Err(err) => return WriteFuture::failed(err),
                 }
                 let redis_key = config.key_name(&session_id);
@@ -199,7 +200,7 @@ impl RawSession for RedisSession {
                 let session_id = session_id.unwrap_or_else(Uuid::new_v4);
                 match input.cookies() {
                     Ok(jar) => jar.add(Cookie::new(
-                        config.cookie_name.to_string(),
+                        config.cookie_name.clone(),
                         session_id.to_string(),
                     )),
                     Err(err) => return WriteFuture::failed(err),
