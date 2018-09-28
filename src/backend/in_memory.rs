@@ -38,20 +38,27 @@ impl Inner {
         &self,
         input: &mut Input,
         session_id: Option<Uuid>,
-        value: Option<String>,
+        value: String,
     ) -> Result<(), Error> {
         let session_id = session_id.unwrap_or_else(Uuid::new_v4);
 
         let mut inner = self.storage.write().map_err(|e| format_err!("{}", e))?;
-        if let Some(value) = value {
-            inner.insert(session_id.clone(), value);
-        } else {
-            inner.remove(&session_id);
-        }
+        inner.insert(session_id.clone(), value);
 
         input
             .cookies()?
             .add(Cookie::new("session-id", session_id.to_string()));
+
+        Ok(())
+    }
+
+    fn remove_value(&self, input: &mut Input, session_id: Option<Uuid>) -> Result<(), Error> {
+        if let Some(session_id) = session_id {
+            let mut inner = self.storage.write().map_err(|e| format_err!("{}", e))?;
+            inner.remove(&session_id);
+
+            input.cookies()?.remove(Cookie::named("session-id"));
+        }
 
         Ok(())
     }
@@ -89,7 +96,10 @@ pub struct InMemorySession {
 
 impl InMemorySession {
     fn write_impl(self, input: &mut Input) -> Result<(), Error> {
-        self.inner.write_value(input, self.session_id, self.value)
+        match self.value {
+            Some(value) => self.inner.write_value(input, self.session_id, value),
+            None => self.inner.remove_value(input, self.session_id),
+        }
     }
 }
 

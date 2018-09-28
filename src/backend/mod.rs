@@ -67,6 +67,11 @@ impl<T: SessionBackend> SessionBackend for Arc<T> {
     }
 }
 
+/// Create a session backend which uses in-memory database.
+pub fn in_memory() -> self::in_memory::InMemorySessionBackend {
+    self::in_memory::InMemorySessionBackend::default()
+}
+
 /// Create a session backend which uses the specified Redis client.
 #[cfg(feature = "redis")]
 pub fn redis(client: ::redis::Client) -> self::redis::RedisSessionBackend {
