@@ -32,7 +32,7 @@ pub mod backend;
 
 // ====
 
-use finchers::endpoint::{Context, Endpoint, EndpointResult};
+use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
 use finchers::error::Error;
 
 use futures::{Future, IntoFuture, Poll};
@@ -69,7 +69,7 @@ where
     type Output = (Session<T, S::Session>,);
     type Future = ReadSessionFuture<T, S::ReadFuture>;
 
-    fn apply(&'a self, cx: &mut Context<'_>) -> EndpointResult<Self::Future> {
+    fn apply(&'a self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
         Ok(ReadSessionFuture {
             future: self.backend.read(cx.input()),
             _marker: PhantomData,
@@ -159,7 +159,7 @@ where
 
     fn into_future(self) -> Self::Future {
         WriteSessionFuture {
-            future: finchers::input::with_get_cx(|input| self.raw.write(input)),
+            future: finchers::endpoint::with_get_cx(|input| self.raw.write(input)),
         }
     }
 }
