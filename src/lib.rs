@@ -19,6 +19,7 @@ extern crate cookie;
 #[macro_use]
 extern crate failure;
 extern crate finchers;
+#[cfg_attr(feature = "redis", macro_use)]
 extern crate futures;
 extern crate serde;
 extern crate serde_json;
