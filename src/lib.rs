@@ -1,4 +1,10 @@
-//! Session support for Finchers
+//! Session support for Finchers.
+//!
+//! Supported backends:
+//!
+//! * Cookie
+//! * In-memory database
+//! * Redis (requires the feature flag `feature = "redis"`)
 
 // master
 #![doc(html_root_url = "https://finchers-rs.github.io/finchers-session")]

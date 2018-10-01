@@ -1,4 +1,41 @@
-//! The implementation of Redis session backend.
+//! The session backend using Redis.
+//!
+//! # Example
+//!
+//! ```
+//! #[macro_use]
+//! extern crate finchers;
+//! extern crate finchers_session;
+//!
+//! use finchers::prelude::*;
+//! use finchers_session::Session;
+//! use finchers_session::redis::{
+//!     Client,
+//!     RedisBackend,
+//!     RedisSession,
+//! };
+//! use std::time::Duration;
+//!
+//! # fn main() {
+//! # drop(|| {
+//! let client = Client::open("redis://127.0.0.1/").unwrap();
+//! let backend = RedisBackend::new(client)
+//!     .key_prefix("my-app-name")
+//!     .cookie_name("sid")
+//!     .timeout(Duration::from_secs(60*3));
+//!
+//! let endpoint = path!(@get /)
+//!     .and(backend)
+//!     .and_then(|session: Session<RedisSession>| {
+//!         session.with(|_session| {
+//!             // ...
+//! #           Ok("done")
+//!         })
+//!     });
+//! # finchers::launch(endpoint).start("127.0.0.1:4000");
+//! # });
+//! # }
+//! ```
 
 extern crate cookie;
 extern crate redis;

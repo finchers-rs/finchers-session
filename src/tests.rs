@@ -12,7 +12,6 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Op {
-    Read,
     Get,
     Set(String),
     Remove,
@@ -88,12 +87,6 @@ fn test_session_with() {
 
     assert_eq!(
         call_chain.result(),
-        vec![
-            Op::Read,
-            Op::Get,
-            Op::Set("foo".into()),
-            Op::Remove,
-            Op::Write,
-        ]
+        vec![Op::Get, Op::Set("foo".into()), Op::Remove, Op::Write,]
     );
 }

@@ -1,4 +1,33 @@
-//! The implementation of session backend used in-memory database.
+//! The session backend using in-memory database.
+//!
+//! # Example
+//!
+//! ```
+//! #[macro_use]
+//! extern crate finchers;
+//! extern crate finchers_session;
+//!
+//! use finchers::prelude::*;
+//! use finchers_session::Session;
+//! use finchers_session::in_memory::{
+//!     InMemoryBackend,
+//!     InMemorySession,
+//! };
+//!
+//! # fn main() {
+//! let backend = InMemoryBackend::default();
+//!
+//! let endpoint = path!(@get /)
+//!     .and(backend)
+//!     .and_then(|session: Session<InMemorySession>| {
+//!         session.with(|_session| {
+//!             // ...
+//! #           Ok("done")
+//!         })
+//!     });
+//! # drop(move || finchers::launch(endpoint).start("127.0.0.1:4000"));
+//! # }
+//! ```
 
 extern crate cookie;
 

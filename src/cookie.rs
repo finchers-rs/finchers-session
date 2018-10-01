@@ -1,4 +1,31 @@
-//! The implementation of Cookie session backend.
+//! The session backend using Cookie as a session storage.
+//!
+//! # Example
+//!
+//! ```
+//! #[macro_use]
+//! extern crate finchers;
+//! extern crate finchers_session;
+//!
+//! use finchers::prelude::*;
+//! use finchers_session::Session;
+//! use finchers_session::cookie::CookieSession;
+//!
+//! # fn main() {
+//! const SECRET_KEY: &str = "very-very-secret-key-at-least-32-chars";
+//! let backend = finchers_session::cookie::signed(SECRET_KEY);
+//!
+//! let endpoint = path!(@get /)
+//!     .and(backend)
+//!     .and_then(|session: Session<CookieSession>| {
+//!         session.with(|_session| {
+//!             // ...
+//! #           Ok("done")
+//!         })
+//!     });
+//! # drop(move || finchers::launch(endpoint).start("127.0.0.1:4000"));
+//! # }
+//! ```
 
 extern crate cookie;
 
