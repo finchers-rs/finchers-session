@@ -1,6 +1,20 @@
+//! The implementation of Redis session backend.
+
 pub use self::imp::{RedisBackend, RedisSession};
 
+#[doc(no_inline)]
+pub use self::imp::redis::Client;
+
+/// Create a session backend which uses the specified Redis client.
+pub fn redis(client: Client) -> RedisBackend {
+    RedisBackend::new(client)
+}
+
 mod imp {
+    extern crate cookie;
+    #[allow(unreachable_pub)]
+    pub extern crate redis;
+
     use finchers;
     use finchers::error::Error;
     use finchers::input::Input;
@@ -11,11 +25,10 @@ mod imp {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use redis;
-    use redis::async::Connection;
-    use redis::{Client, RedisFuture};
+    use self::redis::async::Connection;
+    use self::redis::{Client, RedisFuture};
 
-    use cookie::Cookie;
+    use self::cookie::Cookie;
     use futures::{Async, Future, Poll};
     use uuid::Uuid;
 

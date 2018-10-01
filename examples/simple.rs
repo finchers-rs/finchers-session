@@ -13,7 +13,7 @@ use finchers::prelude::*;
 
 use http::Response;
 
-type Session = finchers_session::Session<finchers_session::backend::in_memory::InMemorySession>;
+type Session = finchers_session::Session<finchers_session::in_memory::InMemorySession>;
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct SessionValue {
@@ -24,15 +24,15 @@ fn main() {
     pretty_env_logger::init();
 
     // Uses in memory database backend:
-    let backend = finchers_session::backend::in_memory();
+    let backend = finchers_session::in_memory::in_memory();
 
     // Uses cookie backend:
     // let master_key = "this-is-a-very-very-secret-master-key";
-    // let backend = finchers_session::backend::cookie::signed(master_key);
+    // let backend = finchers_session::cookie::signed(master_key);
 
     // Uses redis backend:
     // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let backend = finchers_session::backend::redis(client);
+    // let backend = finchers_session::redis::redis(client);
 
     // Create an endpoint which extracts a session manager from request.
     let session = finchers_session::session(backend);

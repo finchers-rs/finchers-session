@@ -1,13 +1,12 @@
-extern crate finchers;
-extern crate finchers_session;
-extern crate futures;
-
 use finchers::error::Error;
 use finchers::input::Input;
 use finchers::local;
 use finchers::prelude::*;
-use finchers_session::backend::{Backend, RawSession};
-use finchers_session::Session;
+
+use futures::future;
+
+use backend::{Backend, RawSession};
+use Session;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -43,11 +42,11 @@ struct MockBackend {
 
 impl Backend for MockBackend {
     type Session = MockSession;
-    type ReadFuture = futures::future::FutureResult<Self::Session, Error>;
+    type ReadFuture = future::FutureResult<Self::Session, Error>;
 
     fn read(&self, _: &mut Input) -> Self::ReadFuture {
         self.call_chain.register(Op::Read);
-        futures::future::ok(MockSession {
+        future::ok(MockSession {
             call_chain: self.call_chain.clone(),
         })
     }
@@ -58,7 +57,7 @@ struct MockSession {
 }
 
 impl RawSession for MockSession {
-    type WriteFuture = futures::future::FutureResult<(), Error>;
+    type WriteFuture = future::FutureResult<(), Error>;
 
     fn get(&self) -> Option<&str> {
         self.call_chain.register(Op::Get);
@@ -75,7 +74,7 @@ impl RawSession for MockSession {
 
     fn write(self, _: &mut Input) -> Self::WriteFuture {
         self.call_chain.register(Op::Write);
-        futures::future::ok(())
+        future::ok(())
     }
 }
 
@@ -83,7 +82,7 @@ impl RawSession for MockSession {
 fn test_session_with() {
     let backend = Rc::new(MockBackend::default());
 
-    let session = finchers_session::session(backend.clone());
+    let session = ::session::session(backend.clone());
     let endpoint = session.and_then(|session: Session<MockSession>| {
         session.with(|session| {
             session.get();

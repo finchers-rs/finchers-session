@@ -1,11 +1,4 @@
-#![allow(missing_docs)]
-
 //! The definition of backends.
-
-pub mod cookie;
-pub mod in_memory;
-#[cfg(feature = "redis")]
-pub mod redis;
 
 use finchers::error::Error;
 use finchers::input::Input;
@@ -14,7 +7,8 @@ use futures::Future;
 use std::rc::Rc;
 use std::sync::Arc;
 
-#[allow(missing_docs)]
+// not a public API.
+#[doc(hidden)]
 pub trait Backend {
     type Session: RawSession;
     type ReadFuture: Future<Item = Self::Session, Error = Error>;
@@ -22,7 +16,8 @@ pub trait Backend {
     fn read(&self, input: &mut Input) -> Self::ReadFuture;
 }
 
-#[allow(missing_docs)]
+// not a public API.
+#[doc(hidden)]
 pub trait RawSession {
     type WriteFuture: Future<Item = (), Error = Error>;
 
@@ -60,15 +55,4 @@ impl<T: Backend> Backend for Arc<T> {
     fn read(&self, input: &mut Input) -> Self::ReadFuture {
         (**self).read(input)
     }
-}
-
-/// Create a session backend which uses in-memory database.
-pub fn in_memory() -> self::in_memory::InMemoryBackend {
-    self::in_memory::InMemoryBackend::default()
-}
-
-/// Create a session backend which uses the specified Redis client.
-#[cfg(feature = "redis")]
-pub fn redis(client: ::redis::Client) -> self::redis::RedisBackend {
-    self::redis::RedisBackend::new(client)
 }

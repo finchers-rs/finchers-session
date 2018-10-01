@@ -1,3 +1,7 @@
+//! The implementation of session backend used in-memory database.
+
+extern crate cookie;
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -5,11 +9,16 @@ use finchers;
 use finchers::error::Error;
 use finchers::input::Input;
 
-use cookie::Cookie;
+use self::cookie::Cookie;
 use futures::future;
 use uuid::Uuid;
 
-use super::{Backend, RawSession};
+use backend::{Backend, RawSession};
+
+/// Create a session backend which uses in-memory database.
+pub fn in_memory() -> InMemoryBackend {
+    InMemoryBackend::default()
+}
 
 #[derive(Debug, Default)]
 struct Storage {

@@ -1,14 +1,19 @@
+//! The implementation of Cookie session backend.
+
+extern crate cookie;
+
 use finchers::error::Error;
 use finchers::input::Input;
 
-use cookie::{Cookie, Key, SameSite};
+use self::cookie::{Cookie, Key, SameSite};
 use futures::future;
 use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 use time::Duration;
 
-use super::{Backend, RawSession};
+use backend::{Backend, RawSession};
+use util::BuilderExt;
 
 // TODOs:
 // * add support for setting whether to compress data
@@ -33,18 +38,6 @@ pub fn signed(master: impl AsRef<[u8]>) -> CookieBackend {
 pub fn private(master: impl AsRef<[u8]>) -> CookieBackend {
     CookieBackend::private(Key::from_master(master.as_ref()))
 }
-
-trait BuilderExt: Sized {
-    fn if_some<T>(self, value: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self {
-        if let Some(value) = value {
-            f(self, value)
-        } else {
-            self
-        }
-    }
-}
-
-impl<T> BuilderExt for T {}
 
 enum Security {
     Plain,
