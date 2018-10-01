@@ -5,11 +5,14 @@
 //! * Cookie
 //! * In-memory database
 //! * Redis (requires the feature flag `feature = "redis"`)
+//!
+//! # Feature Flags
+//!
+//! * `redis` - enable Redis backend (default: off)
+//! * `secure` - enable signing and encryption support for Cookie values
+//!              (default: on. it adds the crate `ring` to dependencies).
 
-// master
-#![doc(html_root_url = "https://finchers-rs.github.io/finchers-session")]
-// released
-//#![doc(html_root_url = "https://docs.rs/finchers-session/0.1.0")]
+#![doc(html_root_url = "https://finchers-rs.github.io/docs/finchers-session/v0.1.0")]
 #![warn(
     missing_docs,
     missing_debug_implementations,

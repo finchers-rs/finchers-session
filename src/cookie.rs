@@ -12,8 +12,7 @@
 //! use finchers_session::cookie::CookieSession;
 //!
 //! # fn main() {
-//! const SECRET_KEY: &str = "very-very-secret-key-at-least-32-chars";
-//! let backend = finchers_session::cookie::signed(SECRET_KEY);
+//! let backend = finchers_session::cookie::plain();
 //!
 //! let endpoint = path!(@get /)
 //!     .and(backend)
@@ -33,7 +32,9 @@ use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
 use finchers::error::Error;
 use finchers::input::Input;
 
-use self::cookie::{Cookie, Key, SameSite};
+#[cfg(feature = "secure")]
+use self::cookie::Key;
+use self::cookie::{Cookie, SameSite};
 use futures::future;
 use std::borrow::Cow;
 use std::fmt;
@@ -53,23 +54,29 @@ pub fn plain() -> CookieBackend {
     CookieBackend::plain()
 }
 
-/// Create a `CookieSessionBackend` with signing.
+/// Create a `CookieSessionBackend` with signing
+/// (requires `feature = "secure"`).
 ///
 /// This function is equivalent to `CookieSessionBackend::signed(Key::from_master(key.as_ref()))`.
+#[cfg(feature = "secure")]
 pub fn signed(master: impl AsRef<[u8]>) -> CookieBackend {
     CookieBackend::signed(Key::from_master(master.as_ref()))
 }
 
-/// Create a `CookieSessionBackend` with encryption.
+/// Create a `CookieSessionBackend` with encryption
+/// (requires `feature = "secure"`).
 ///
 /// This function is equivalent to `CookieSessionBackend::private(Key::from_master(key.as_ref()))`.
+#[cfg(feature = "secure")]
 pub fn private(master: impl AsRef<[u8]>) -> CookieBackend {
     CookieBackend::private(Key::from_master(master.as_ref()))
 }
 
 enum Security {
     Plain,
+    #[cfg(feature = "secure")]
     Signed(Key),
+    #[cfg(feature = "secure")]
     Private(Key),
 }
 
@@ -77,7 +84,9 @@ impl fmt::Debug for Security {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Security::Plain => f.debug_tuple("Plain").finish(),
+            #[cfg(feature = "secure")]
             Security::Signed(..) => f.debug_tuple("Signed").finish(),
+            #[cfg(feature = "secure")]
             Security::Private(..) => f.debug_tuple("Private").finish(),
         }
     }
@@ -100,7 +109,9 @@ impl CookieConfig {
         let jar = input.cookies()?;
         let cookie = match self.security {
             Security::Plain => jar.get(&self.name).cloned(),
+            #[cfg(feature = "secure")]
             Security::Signed(ref key) => jar.signed(key).get(&self.name),
+            #[cfg(feature = "secure")]
             Security::Private(ref key) => jar.private(key).get(&self.name),
         };
 
@@ -123,7 +134,9 @@ impl CookieConfig {
         let jar = input.cookies()?;
         match self.security {
             Security::Plain => jar.add(cookie),
+            #[cfg(feature = "secure")]
             Security::Signed(ref key) => jar.signed(key).add(cookie),
+            #[cfg(feature = "secure")]
             Security::Private(ref key) => jar.private(key).add(cookie),
         }
 
@@ -135,7 +148,9 @@ impl CookieConfig {
         let jar = input.cookies()?;
         match self.security {
             Security::Plain => jar.remove(cookie),
+            #[cfg(feature = "secure")]
             Security::Signed(ref key) => jar.signed(key).remove(cookie),
+            #[cfg(feature = "secure")]
             Security::Private(ref key) => jar.private(key).remove(cookie),
         }
         Ok(())
@@ -170,11 +185,17 @@ impl CookieBackend {
     }
 
     /// Creates a `CookieSessionBackend` which signs the Cookie values with the specified secret key.
+    ///
+    /// This method is only available if the feature flag `secure` is set.
+    #[cfg(feature = "secure")]
     pub fn signed(key: Key) -> CookieBackend {
         CookieBackend::new(Security::Signed(key))
     }
 
     /// Creates a `CookieSessionBackend` which encrypts the Cookie values with the specified secret key.
+    ///
+    /// This method is only available if the feature flag `secure` is set.
+    #[cfg(feature = "secure")]
     pub fn private(key: Key) -> CookieBackend {
         CookieBackend::new(Security::Private(key))
     }

@@ -24,48 +24,41 @@ struct SessionValue {
 fn main() {
     pretty_env_logger::init();
 
-    // Uses in memory database backend:
-    let session = InMemoryBackend::default();
+    let session_endpoint = InMemoryBackend::default();
 
-    // Uses cookie backend:
-    // let master_key = "this-is-a-very-very-secret-master-key";
-    // let session = finchers_session::cookie::signed(master_key);
+    let endpoint = path!(@get /)
+        .and(session_endpoint)
+        .and_then(|session: Session| {
+            session.with(|session| {
+                // Retrieve the value of session.
+                //
+                // Note that the session value are stored as a UTF-8 string,
+                // which means that the user it is necessary for the user to
+                // deserialize/serialize the session data.
+                let mut session_value: SessionValue = {
+                    let s = session.get().unwrap_or(r#"{ "text": "" }"#);
+                    serde_json::from_str(s).map_err(|err| {
+                        finchers::error::bad_request(format!(
+                            "failed to parse session value (input = {:?}): {}",
+                            s, err
+                        ))
+                    })?
+                };
 
-    // Uses redis backend:
-    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let session = finchers_session::redis::redis(client);
+                let response = Response::builder()
+                    .header("content-type", "text/html; charset=utf-8")
+                    .body(format!("{:?}", session_value))
+                    .expect("should be a valid response");
 
-    let endpoint = path!(@get /).and(session).and_then(|session: Session| {
-        session.with(|session| {
-            // Retrieve the value of session.
-            //
-            // Note that the session value are stored as a UTF-8 string,
-            // which means that the user it is necessary for the user to
-            // deserialize/serialize the session data.
-            let mut session_value: SessionValue = {
-                let s = session.get().unwrap_or(r#"{ "text": "" }"#);
-                serde_json::from_str(s).map_err(|err| {
-                    finchers::error::bad_request(format!(
-                        "failed to parse session value (input = {:?}): {}",
-                        s, err
-                    ))
-                })?
-            };
+                session_value.text += "a";
 
-            let response = Response::builder()
-                .header("content-type", "text/html; charset=utf-8")
-                .body(format!("{:?}", session_value))
-                .expect("should be a valid response");
+                // Stores session data to the store.
+                let s = serde_json::to_string(&session_value).map_err(finchers::error::fail)?;
+                session.set(s);
 
-            session_value.text += "a";
-
-            // Stores session data to the store.
-            let s = serde_json::to_string(&session_value).map_err(finchers::error::fail)?;
-            session.set(s);
-
-            Ok(response)
-        })
-    });
+                Ok(response)
+            })
+        });
 
     info!("Listening on http://127.0.0.1:4000");
     finchers::launch(endpoint).start("127.0.0.1:4000");

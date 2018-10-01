@@ -34,7 +34,8 @@ matrix:
         - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test --all-features
+        - cargo test --features "redis secure strict"
+        - cargo test --no-default-features --features "strict"
         - cargo fmt -- --check
         - if [[ "${TRAVIS_PULL_REQUEST_BRANCH:-}" = release-* ]]; then cargo package; fi
       after_success:
@@ -46,14 +47,16 @@ matrix:
         - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test --all-features
+        - cargo test --features "redis secure strict"
+        - cargo test --no-default-features --features "strict"
 
     - rust: nightly
       before_script:
         - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test --all-features
+        - cargo test --features "redis secure"
+        - cargo test --no-default-features
 
     - rust: stable
       env: DEPLOY_API_DOC
@@ -61,7 +64,7 @@ matrix:
       script:
         - rm -rf target/doc
         - cargo update
-        - cargo doc --all-features --no-deps
+        - cargo doc --features "secure redis" --no-deps
         - rm -f target/doc/.lock
         - echo '<meta http-equiv="refresh" content="0;URL=finchers_session/index.html">' > target/doc/index.html
       deploy:
