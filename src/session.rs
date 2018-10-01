@@ -4,8 +4,8 @@ use finchers::input::Input;
 
 use futures::{Future, IntoFuture, Poll};
 
-// not a public API.
-#[doc(hidden)]
+/// The trait representing the backend to manage session value.
+#[allow(missing_docs)]
 pub trait RawSession {
     type WriteFuture: Future<Item = (), Error = Error>;
 
@@ -22,17 +22,15 @@ pub struct Session<S: RawSession> {
     raw: S,
 }
 
-impl<S: RawSession> Session<S> {
-    #[doc(hidden)]
-    pub fn new(raw: S) -> Session<S> {
-        Session { raw }
-    }
-}
-
 impl<S> Session<S>
 where
     S: RawSession,
 {
+    #[allow(missing_docs)]
+    pub fn new(raw: S) -> Session<S> {
+        Session { raw }
+    }
+
     /// Get the session value if available.
     pub fn get(&self) -> Option<&str> {
         self.raw.get()

@@ -33,4 +33,4 @@ pub mod in_memory;
 #[cfg(feature = "redis")]
 pub mod redis;
 
-pub use self::session::Session;
+pub use self::session::{RawSession, Session};
