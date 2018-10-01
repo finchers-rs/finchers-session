@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate finchers;
 extern crate finchers_session;
-extern crate futures;
 extern crate http;
 #[macro_use]
 extern crate log;
@@ -12,10 +11,10 @@ extern crate serde_json;
 
 use finchers::error::Error;
 use finchers::prelude::*;
-use finchers_session::{session, Session};
 
-use futures::prelude::*;
 use http::Response;
+
+type Session = finchers_session::Session<finchers_session::backend::in_memory::InMemorySession>;
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct SessionValue {
@@ -37,11 +36,10 @@ fn main() {
     // let backend = finchers_session::backend::redis(client);
 
     // Create an endpoint which extracts a session manager from request.
-    let session = session(backend);
+    let session = finchers_session::session(backend);
 
-    let endpoint = path!(@get /)
-        .and(session)
-        .and_then(|mut session: Session<_>| -> Result<_, Error> {
+    let endpoint = path!(@get /).and(session).and_then(|session: Session| {
+        session.with(|session| -> Result<_, Error> {
             // Retrieve the value of session.
             //
             // Note that the session value are stored as a UTF-8 string,
@@ -63,11 +61,9 @@ fn main() {
             let s = serde_json::to_string(&session_value).map_err(finchers::error::fail)?;
             session.set(s);
 
-            Ok((response, session))
-        }).and_then(|(response, session): (_, Session<_>)| {
-            //
-            session.into_future().map(|_| response)
-        });
+            Ok(response)
+        })
+    });
 
     info!("Listening on http://127.0.0.1:4000");
     finchers::launch(endpoint).start("127.0.0.1:4000");

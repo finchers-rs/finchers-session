@@ -29,7 +29,7 @@ extern crate redis;
 
 pub mod backend;
 
-pub use self::imp::{session, Session};
+pub use self::imp::{session, Session, SessionEndpoint};
 
 mod imp {
     use finchers::endpoint;
@@ -92,6 +92,7 @@ mod imp {
 
     /// A struct which manages the session value per request.
     #[derive(Debug)]
+    #[must_use = "The value must be convert into a Future to finish the session handling."]
     pub struct Session<S: RawSession> {
         raw: S,
     }
@@ -113,6 +114,21 @@ mod imp {
         /// Annotates to remove session value to the backend.
         pub fn remove(&mut self) {
             self.raw.remove();
+        }
+
+        #[allow(missing_docs)]
+        pub fn with<R>(
+            mut self,
+            f: impl FnOnce(&mut Self) -> R,
+        ) -> impl Future<Item = R::Item, Error = Error>
+        where
+            R: IntoFuture,
+            Error: From<R::Error>,
+        {
+            f(&mut self)
+                .into_future()
+                .from_err()
+                .and_then(move |item| self.into_future().map(move |()| item))
         }
     }
 
