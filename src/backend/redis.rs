@@ -95,7 +95,6 @@ mod imp {
 
     impl Backend for RedisBackend {
         type Session = RedisSession;
-        type ReadError = Error;
         type ReadFuture = ReadFuture;
 
         fn read(&self, input: &mut Input) -> Self::ReadFuture {
@@ -251,7 +250,6 @@ mod imp {
     }
 
     impl RawSession for RedisSession {
-        type WriteError = Error;
         type WriteFuture = WriteFuture;
 
         fn get(&self) -> Option<&str> {

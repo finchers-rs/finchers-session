@@ -71,8 +71,7 @@ pub struct InMemoryBackend {
 
 impl Backend for InMemoryBackend {
     type Session = InMemorySession;
-    type ReadError = Error;
-    type ReadFuture = future::FutureResult<Self::Session, Self::ReadError>;
+    type ReadFuture = future::FutureResult<Self::Session, Error>;
 
     fn read(&self, input: &mut Input) -> Self::ReadFuture {
         future::result(
@@ -104,8 +103,7 @@ impl InMemorySession {
 }
 
 impl RawSession for InMemorySession {
-    type WriteError = Error;
-    type WriteFuture = future::FutureResult<(), Self::WriteError>;
+    type WriteFuture = future::FutureResult<(), Error>;
 
     fn get(&self) -> Option<&str> {
         self.value.as_ref().map(|s| s.as_ref())

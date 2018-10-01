@@ -212,8 +212,7 @@ impl CookieBackend {
 
 impl Backend for CookieBackend {
     type Session = CookieSession;
-    type ReadError = Error;
-    type ReadFuture = future::FutureResult<Self::Session, Self::ReadError>;
+    type ReadFuture = future::FutureResult<Self::Session, Error>;
 
     fn read(&self, input: &mut Input) -> Self::ReadFuture {
         future::result(self.config.read_value(input).map(|value| CookieSession {
@@ -240,8 +239,7 @@ impl CookieSession {
 }
 
 impl RawSession for CookieSession {
-    type WriteError = Error;
-    type WriteFuture = future::FutureResult<(), Self::WriteError>;
+    type WriteFuture = future::FutureResult<(), Error>;
 
     fn get(&self) -> Option<&str> {
         self.value.as_ref().map(|s| s.as_str())

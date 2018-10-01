@@ -15,9 +15,16 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 #[allow(missing_docs)]
+pub trait Backend {
+    type Session: RawSession;
+    type ReadFuture: Future<Item = Self::Session, Error = Error>;
+
+    fn read(&self, input: &mut Input) -> Self::ReadFuture;
+}
+
+#[allow(missing_docs)]
 pub trait RawSession {
-    type WriteError: Into<Error>;
-    type WriteFuture: Future<Item = (), Error = Self::WriteError>;
+    type WriteFuture: Future<Item = (), Error = Error>;
 
     fn get(&self) -> Option<&str>;
     fn set(&mut self, value: String);
@@ -25,18 +32,8 @@ pub trait RawSession {
     fn write(self, input: &mut Input) -> Self::WriteFuture;
 }
 
-#[allow(missing_docs)]
-pub trait Backend {
-    type Session: RawSession;
-    type ReadError: Into<Error>;
-    type ReadFuture: Future<Item = Self::Session, Error = Self::ReadError>;
-
-    fn read(&self, input: &mut Input) -> Self::ReadFuture;
-}
-
 impl<T: Backend> Backend for Box<T> {
     type Session = T::Session;
-    type ReadError = T::ReadError;
     type ReadFuture = T::ReadFuture;
 
     #[inline]
@@ -47,7 +44,6 @@ impl<T: Backend> Backend for Box<T> {
 
 impl<T: Backend> Backend for Rc<T> {
     type Session = T::Session;
-    type ReadError = T::ReadError;
     type ReadFuture = T::ReadFuture;
 
     #[inline]
@@ -58,7 +54,6 @@ impl<T: Backend> Backend for Rc<T> {
 
 impl<T: Backend> Backend for Arc<T> {
     type Session = T::Session;
-    type ReadError = T::ReadError;
     type ReadFuture = T::ReadFuture;
 
     #[inline]
