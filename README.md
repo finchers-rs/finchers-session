@@ -7,5 +7,11 @@
 
 Session support for Finchers.
 
+## Supported Backends
+
+* In-memory storage
+* Cookie
+* Redis (requires the feature flag `feature = "redis"`)
+
 # License
 [MIT license](LICENSE-MIT) or [Apache License, Version 2.0](LICENSE-APACHE) at your option.
