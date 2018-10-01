@@ -2,6 +2,7 @@
 
 extern crate cookie;
 
+use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
 use finchers::error::Error;
 use finchers::input::Input;
 
@@ -12,7 +13,7 @@ use std::fmt;
 use std::sync::Arc;
 use time::Duration;
 
-use backend::{Backend, RawSession};
+use session::{RawSession, Session};
 use util::BuilderExt;
 
 // TODOs:
@@ -114,6 +115,7 @@ impl CookieConfig {
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct CookieBackend {
     config: Arc<CookieConfig>,
@@ -203,18 +205,23 @@ impl CookieBackend {
     }
 }
 
-impl Backend for CookieBackend {
-    type Session = CookieSession;
-    type ReadFuture = future::FutureResult<Self::Session, Error>;
+impl<'a> Endpoint<'a> for CookieBackend {
+    type Output = (Session<CookieSession>,);
+    type Future = future::FutureResult<Self::Output, Error>;
 
-    fn read(&self, input: &mut Input) -> Self::ReadFuture {
-        future::result(self.config.read_value(input).map(|value| CookieSession {
-            config: self.config.clone(),
-            value,
-        }))
+    fn apply(&self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
+        Ok(future::result(self.config.read_value(cx.input()).map(
+            |value| {
+                (Session::new(CookieSession {
+                    config: self.config.clone(),
+                    value,
+                }),)
+            },
+        )))
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Debug)]
 pub struct CookieSession {
     config: Arc<CookieConfig>,

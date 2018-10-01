@@ -10,10 +10,11 @@ extern crate serde;
 extern crate serde_json;
 
 use finchers::prelude::*;
+use finchers_session::in_memory::{InMemoryBackend, InMemorySession};
 
 use http::Response;
 
-type Session = finchers_session::Session<finchers_session::in_memory::InMemorySession>;
+type Session = finchers_session::Session<InMemorySession>;
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct SessionValue {
@@ -24,18 +25,15 @@ fn main() {
     pretty_env_logger::init();
 
     // Uses in memory database backend:
-    let backend = finchers_session::in_memory::in_memory();
+    let session = InMemoryBackend::default();
 
     // Uses cookie backend:
     // let master_key = "this-is-a-very-very-secret-master-key";
-    // let backend = finchers_session::cookie::signed(master_key);
+    // let session = finchers_session::cookie::signed(master_key);
 
     // Uses redis backend:
     // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let backend = finchers_session::redis::redis(client);
-
-    // Create an endpoint which extracts a session manager from request.
-    let session = finchers_session::session(backend);
+    // let session = finchers_session::redis::redis(client);
 
     let endpoint = path!(@get /).and(session).and_then(|session: Session| {
         session.with(|session| {

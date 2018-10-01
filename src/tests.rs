@@ -5,8 +5,7 @@ use finchers::prelude::*;
 
 use futures::future;
 
-use backend::{Backend, RawSession};
-use Session;
+use session::{RawSession, Session};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,23 +31,6 @@ impl CallChain {
 
     fn result(&self) -> Vec<Op> {
         self.chain.borrow().clone()
-    }
-}
-
-#[derive(Default)]
-struct MockBackend {
-    call_chain: Rc<CallChain>,
-}
-
-impl Backend for MockBackend {
-    type Session = MockSession;
-    type ReadFuture = future::FutureResult<Self::Session, Error>;
-
-    fn read(&self, _: &mut Input) -> Self::ReadFuture {
-        self.call_chain.register(Op::Read);
-        future::ok(MockSession {
-            call_chain: self.call_chain.clone(),
-        })
     }
 }
 
@@ -80,10 +62,17 @@ impl RawSession for MockSession {
 
 #[test]
 fn test_session_with() {
-    let backend = Rc::new(MockBackend::default());
+    let call_chain = Rc::new(CallChain::default());
 
-    let session = ::session::session(backend.clone());
-    let endpoint = session.and_then(|session: Session<MockSession>| {
+    let session_endpoint = endpoint::apply_fn({
+        let call_chain = call_chain.clone();
+        move |_cx| {
+            Ok(Ok((Session::new(MockSession {
+                call_chain: call_chain.clone(),
+            }),)))
+        }
+    });
+    let endpoint = session_endpoint.and_then(|session: Session<MockSession>| {
         session.with(|session| {
             session.get();
             session.set("foo");
@@ -98,7 +87,7 @@ fn test_session_with() {
     assert!(!response.headers().contains_key("set-cookie"));
 
     assert_eq!(
-        backend.call_chain.result(),
+        call_chain.result(),
         vec![
             Op::Read,
             Op::Get,

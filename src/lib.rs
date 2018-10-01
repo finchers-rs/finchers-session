@@ -23,7 +23,6 @@ extern crate futures;
 extern crate time;
 extern crate uuid;
 
-mod backend;
 mod session;
 #[cfg(test)]
 mod tests;
@@ -34,4 +33,4 @@ pub mod in_memory;
 #[cfg(feature = "redis")]
 pub mod redis;
 
-pub use self::session::{session, Session, SessionEndpoint};
+pub use self::session::Session;

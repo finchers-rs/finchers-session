@@ -5,17 +5,13 @@ pub use self::imp::{RedisBackend, RedisSession};
 #[doc(no_inline)]
 pub use self::imp::redis::Client;
 
-/// Create a session backend which uses the specified Redis client.
-pub fn redis(client: Client) -> RedisBackend {
-    RedisBackend::new(client)
-}
-
 mod imp {
     extern crate cookie;
     #[allow(unreachable_pub)]
     pub extern crate redis;
 
     use finchers;
+    use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
     use finchers::error::Error;
     use finchers::input::Input;
 
@@ -32,7 +28,7 @@ mod imp {
     use futures::{Async, Future, Poll};
     use uuid::Uuid;
 
-    use backend::{Backend, RawSession};
+    use session::{RawSession, Session};
 
     #[derive(Debug)]
     struct RedisSessionConfig {
@@ -106,14 +102,18 @@ mod imp {
         }
     }
 
-    impl Backend for RedisBackend {
-        type Session = RedisSession;
-        type ReadFuture = ReadFuture;
+    impl<'a> Endpoint<'a> for RedisBackend {
+        type Output = (Session<RedisSession>,);
+        type Future = ReadFuture;
 
-        fn read(&self, input: &mut Input) -> Self::ReadFuture {
-            match self.config.get_session_id(input) {
-                Ok(session_id) => ReadFuture::connecting(&self.client, &self.config, session_id),
-                Err(err) => return ReadFuture::failed(err),
+        fn apply(&self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
+            match self.config.get_session_id(cx.input()) {
+                Ok(session_id) => Ok(ReadFuture::connecting(
+                    &self.client,
+                    &self.config,
+                    session_id,
+                )),
+                Err(err) => Ok(ReadFuture::failed(err)),
             }
         }
     }
@@ -162,7 +162,7 @@ mod imp {
     }
 
     impl Future for ReadFuture {
-        type Item = RedisSession;
+        type Item = (Session<RedisSession>,);
         type Error = Error;
 
         fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -210,12 +210,12 @@ mod imp {
                         Some(conn),
                         Some(value),
                     ) => {
-                        return Ok(Async::Ready(RedisSession {
+                        return Ok(Async::Ready((Session::new(RedisSession {
                             conn,
                             config,
                             session_id: Some(session_id),
                             value: Some(value),
-                        }))
+                        }),)))
                     }
 
                     (
@@ -228,12 +228,12 @@ mod imp {
                         None,
                     )
                     | (Fetch { config, .. }, Some(conn), None) => {
-                        return Ok(Async::Ready(RedisSession {
+                        return Ok(Async::Ready((Session::new(RedisSession {
                             conn,
                             config,
                             session_id: None,
                             value: None,
-                        }));
+                        }),)));
                     }
 
                     _ => unreachable!("unexpected condition"),

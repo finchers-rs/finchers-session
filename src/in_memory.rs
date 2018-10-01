@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use finchers;
+use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
 use finchers::error::Error;
 use finchers::input::Input;
 
@@ -13,12 +14,7 @@ use self::cookie::Cookie;
 use futures::future;
 use uuid::Uuid;
 
-use backend::{Backend, RawSession};
-
-/// Create a session backend which uses in-memory database.
-pub fn in_memory() -> InMemoryBackend {
-    InMemoryBackend::default()
-}
+use session::{RawSession, Session};
 
 #[derive(Debug, Default)]
 struct Storage {
@@ -44,6 +40,7 @@ impl Storage {
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryBackend {
     inner: Arc<Inner>,
@@ -84,22 +81,24 @@ impl InMemoryBackend {
     }
 }
 
-impl Backend for InMemoryBackend {
-    type Session = InMemorySession;
-    type ReadFuture = future::FutureResult<Self::Session, Error>;
+impl<'a> Endpoint<'a> for InMemoryBackend {
+    type Output = (Session<InMemorySession>,);
+    type Future = future::FutureResult<Self::Output, Error>;
 
-    fn read(&self, input: &mut Input) -> Self::ReadFuture {
-        future::result(
-            self.read_value(input)
-                .map(|(value, session_id)| InMemorySession {
+    fn apply(&self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
+        Ok(future::result(self.read_value(cx.input()).map(
+            |(value, session_id)| {
+                (Session::new(InMemorySession {
                     backend: self.clone(),
                     value,
                     session_id,
-                }),
-        )
+                }),)
+            },
+        )))
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Debug)]
 pub struct InMemorySession {
     backend: InMemoryBackend,

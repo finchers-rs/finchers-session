@@ -1,59 +1,18 @@
 use finchers::endpoint;
-use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
 use finchers::error::Error;
+use finchers::input::Input;
 
 use futures::{Future, IntoFuture, Poll};
 
-use backend::{Backend, RawSession};
+// not a public API.
+#[doc(hidden)]
+pub trait RawSession {
+    type WriteFuture: Future<Item = (), Error = Error>;
 
-/// Create an endpoint which extracts a session manager from the request.
-pub fn session<B>(backend: B) -> SessionEndpoint<B>
-where
-    B: Backend,
-{
-    SessionEndpoint { backend }
-}
-
-#[allow(missing_docs)]
-#[derive(Debug, Copy, Clone)]
-pub struct SessionEndpoint<B: Backend> {
-    backend: B,
-}
-
-impl<'a, B> Endpoint<'a> for SessionEndpoint<B>
-where
-    B: Backend + 'a,
-{
-    type Output = (Session<B::Session>,);
-    type Future = ReadSessionFuture<B::ReadFuture>;
-
-    fn apply(&'a self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
-        Ok(ReadSessionFuture {
-            future: self.backend.read(cx.input()),
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct ReadSessionFuture<F> {
-    future: F,
-}
-
-impl<F> Future for ReadSessionFuture<F>
-where
-    F: Future,
-    F::Item: RawSession,
-    F::Error: Into<Error>,
-{
-    type Item = (Session<F::Item>,);
-    type Error = Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.future
-            .poll()
-            .map_err(Into::into)
-            .map(|x| x.map(|raw| (Session { raw },)))
-    }
+    fn get(&self) -> Option<&str>;
+    fn set(&mut self, value: String);
+    fn remove(&mut self);
+    fn write(self, input: &mut Input) -> Self::WriteFuture;
 }
 
 /// A struct which manages the session value per request.
@@ -61,6 +20,13 @@ where
 #[must_use = "The value must be convert into a Future to finish the session handling."]
 pub struct Session<S: RawSession> {
     raw: S,
+}
+
+impl<S: RawSession> Session<S> {
+    #[doc(hidden)]
+    pub fn new(raw: S) -> Session<S> {
+        Session { raw }
+    }
 }
 
 impl<S> Session<S>
