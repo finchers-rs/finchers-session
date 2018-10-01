@@ -12,54 +12,25 @@ use uuid::Uuid;
 use super::{Backend, RawSession};
 
 #[derive(Debug, Default)]
-struct Inner {
-    storage: RwLock<HashMap<Uuid, String>>,
+struct Storage {
+    inner: RwLock<HashMap<Uuid, String>>,
 }
 
-impl Inner {
-    fn read_value(&self, input: &mut Input) -> Result<(Option<String>, Option<Uuid>), Error> {
-        match input.cookies()?.get("session-id") {
-            Some(cookie) => {
-                let session_id: Uuid = cookie
-                    .value()
-                    .parse()
-                    .map_err(finchers::error::bad_request)?;
-
-                let inner = self.storage.read().map_err(|e| format_err!("{}", e))?;
-                let value = inner.get(&session_id).cloned();
-
-                Ok((value, Some(session_id)))
-            }
-            None => Ok((None, None)),
-        }
+impl Storage {
+    fn get(&self, session_id: &Uuid) -> Result<Option<String>, Error> {
+        let inner = self.inner.read().map_err(|e| format_err!("{}", e))?;
+        Ok(inner.get(&session_id).cloned())
     }
 
-    fn write_value(
-        &self,
-        input: &mut Input,
-        session_id: Option<Uuid>,
-        value: String,
-    ) -> Result<(), Error> {
-        let session_id = session_id.unwrap_or_else(Uuid::new_v4);
-
-        let mut inner = self.storage.write().map_err(|e| format_err!("{}", e))?;
-        inner.insert(session_id.clone(), value);
-
-        input
-            .cookies()?
-            .add(Cookie::new("session-id", session_id.to_string()));
-
+    fn set(&self, session_id: Uuid, value: String) -> Result<(), Error> {
+        let mut inner = self.inner.write().map_err(|e| format_err!("{}", e))?;
+        inner.insert(session_id, value);
         Ok(())
     }
 
-    fn remove_value(&self, input: &mut Input, session_id: Option<Uuid>) -> Result<(), Error> {
-        if let Some(session_id) = session_id {
-            let mut inner = self.storage.write().map_err(|e| format_err!("{}", e))?;
-            inner.remove(&session_id);
-
-            input.cookies()?.remove(Cookie::named("session-id"));
-        }
-
+    fn remove(&self, session_id: &Uuid) -> Result<(), Error> {
+        let mut inner = self.inner.write().map_err(|e| format_err!("{}", e))?;
+        inner.remove(&session_id);
         Ok(())
     }
 }
@@ -69,16 +40,50 @@ pub struct InMemoryBackend {
     inner: Arc<Inner>,
 }
 
+#[derive(Debug, Default)]
+struct Inner {
+    storage: Storage,
+}
+
+impl InMemoryBackend {
+    fn read_value(&self, input: &mut Input) -> Result<(Option<String>, Option<Uuid>), Error> {
+        match input.cookies()?.get("session-id") {
+            Some(cookie) => {
+                let session_id: Uuid = cookie
+                    .value()
+                    .parse()
+                    .map_err(finchers::error::bad_request)?;
+                let value = self.inner.storage.get(&session_id)?;
+                Ok((value, Some(session_id)))
+            }
+            None => Ok((None, None)),
+        }
+    }
+
+    fn write_value(&self, input: &mut Input, session_id: Uuid, value: String) -> Result<(), Error> {
+        self.inner.storage.set(session_id.clone(), value)?;
+        input
+            .cookies()?
+            .add(Cookie::new("session-id", session_id.to_string()));
+        Ok(())
+    }
+
+    fn remove_value(&self, input: &mut Input, session_id: Uuid) -> Result<(), Error> {
+        self.inner.storage.remove(&session_id)?;
+        input.cookies()?.remove(Cookie::named("session-id"));
+        Ok(())
+    }
+}
+
 impl Backend for InMemoryBackend {
     type Session = InMemorySession;
     type ReadFuture = future::FutureResult<Self::Session, Error>;
 
     fn read(&self, input: &mut Input) -> Self::ReadFuture {
         future::result(
-            self.inner
-                .read_value(input)
+            self.read_value(input)
                 .map(|(value, session_id)| InMemorySession {
-                    inner: self.inner.clone(),
+                    backend: self.clone(),
                     value,
                     session_id,
                 }),
@@ -88,7 +93,7 @@ impl Backend for InMemoryBackend {
 
 #[derive(Debug)]
 pub struct InMemorySession {
-    inner: Arc<Inner>,
+    backend: InMemoryBackend,
     session_id: Option<Uuid>,
     value: Option<String>,
 }
@@ -96,8 +101,14 @@ pub struct InMemorySession {
 impl InMemorySession {
     fn write_impl(self, input: &mut Input) -> Result<(), Error> {
         match self.value {
-            Some(value) => self.inner.write_value(input, self.session_id, value),
-            None => self.inner.remove_value(input, self.session_id),
+            Some(value) => {
+                let session_id = self.session_id.unwrap_or_else(Uuid::new_v4);
+                self.backend.write_value(input, session_id, value)
+            }
+            None => match self.session_id {
+                Some(session_id) => self.backend.remove_value(input, session_id),
+                None => Ok(()),
+            },
         }
     }
 }
