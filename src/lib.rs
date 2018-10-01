@@ -21,8 +21,6 @@ extern crate failure;
 extern crate finchers;
 #[cfg_attr(feature = "redis", macro_use)]
 extern crate futures;
-extern crate serde;
-extern crate serde_json;
 extern crate time;
 extern crate uuid;
 
@@ -31,156 +29,124 @@ extern crate redis;
 
 pub mod backend;
 
-// ====
+pub use self::imp::{session, Session};
 
-use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
-use finchers::error::Error;
+mod imp {
+    use finchers::endpoint;
+    use finchers::endpoint::{ApplyContext, ApplyResult, Endpoint};
+    use finchers::error::Error;
 
-use futures::{Future, IntoFuture, Poll};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::marker::PhantomData;
+    use futures::{Future, IntoFuture, Poll};
 
-use backend::{Backend, RawSession};
+    use backend::{Backend, RawSession};
 
-/// Create an endpoint which extracts a session manager from the request.
-pub fn session<T, S>(backend: S) -> SessionEndpoint<T, S>
-where
-    T: Serialize + DeserializeOwned,
-    S: Backend,
-{
-    SessionEndpoint {
-        backend,
-        _marker: PhantomData,
+    /// Create an endpoint which extracts a session manager from the request.
+    pub fn session<B>(backend: B) -> SessionEndpoint<B>
+    where
+        B: Backend,
+    {
+        SessionEndpoint { backend }
     }
-}
 
-#[allow(missing_docs)]
-#[derive(Debug, Copy, Clone)]
-pub struct SessionEndpoint<T, S> {
-    backend: S,
-    _marker: PhantomData<fn() -> T>,
-}
-
-impl<'a, T, S> Endpoint<'a> for SessionEndpoint<T, S>
-where
-    T: Serialize + DeserializeOwned + 'a,
-    S: Backend + 'a,
-{
-    type Output = (Session<T, S::Session>,);
-    type Future = ReadSessionFuture<T, S::ReadFuture>;
-
-    fn apply(&'a self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
-        Ok(ReadSessionFuture {
-            future: self.backend.read(cx.input()),
-            _marker: PhantomData,
-        })
+    #[allow(missing_docs)]
+    #[derive(Debug, Copy, Clone)]
+    pub struct SessionEndpoint<B: Backend> {
+        backend: B,
     }
-}
 
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct ReadSessionFuture<T, F> {
-    future: F,
-    _marker: PhantomData<fn() -> T>,
-}
+    impl<'a, B> Endpoint<'a> for SessionEndpoint<B>
+    where
+        B: Backend + 'a,
+    {
+        type Output = (Session<B::Session>,);
+        type Future = ReadSessionFuture<B::ReadFuture>;
 
-impl<T, F> Future for ReadSessionFuture<T, F>
-where
-    T: Serialize + DeserializeOwned,
-    F: Future,
-    F::Item: RawSession,
-    F::Error: Into<Error>,
-{
-    type Item = (Session<T, F::Item>,);
-    type Error = Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.future.poll().map_err(Into::into).map(|x| {
-            x.map(|raw| {
-                (Session {
-                    raw,
-                    _marker: PhantomData,
-                },)
+        fn apply(&'a self, cx: &mut ApplyContext<'_>) -> ApplyResult<Self::Future> {
+            Ok(ReadSessionFuture {
+                future: self.backend.read(cx.input()),
             })
-        })
-    }
-}
-
-/// A struct which manages the session value per request.
-#[derive(Debug)]
-pub struct Session<T, S> {
-    raw: S,
-    _marker: PhantomData<fn() -> T>,
-}
-
-impl<T, S> Session<T, S>
-where
-    T: Serialize + DeserializeOwned,
-    S: RawSession,
-{
-    /// Get the session value if available.
-    pub fn get(&self) -> Result<Option<T>, Error> {
-        if let Some(value) = self.raw.get() {
-            serde_json::from_str(&value)
-                .map(Some)
-                .map_err(finchers::error::bad_request)
-        } else {
-            Ok(None)
         }
     }
 
-    /// Set the session value.
-    pub fn set(&mut self, value: T) -> Result<(), Error> {
-        let value = serde_json::to_string(&value).map_err(finchers::error::fail)?;
-        self.raw.set(value);
-        Ok(())
+    #[derive(Debug)]
+    pub struct ReadSessionFuture<F> {
+        future: F,
     }
 
-    /// Annotates to remove session value to the backend.
-    pub fn remove(&mut self) {
-        self.raw.remove();
-    }
+    impl<F> Future for ReadSessionFuture<F>
+    where
+        F: Future,
+        F::Item: RawSession,
+        F::Error: Into<Error>,
+    {
+        type Item = (Session<F::Item>,);
+        type Error = Error;
 
-    #[doc(hidden)]
-    #[deprecated(note = "use `into_future()` instead.")]
-    pub fn finish(self) -> impl Future<Item = (), Error = Error> {
-        self.into_future()
-    }
-}
-
-impl<T, S> IntoFuture for Session<T, S>
-where
-    T: Serialize + DeserializeOwned,
-    S: RawSession,
-{
-    type Item = ();
-    type Error = Error;
-    type Future = WriteSessionFuture<S::WriteFuture>;
-
-    fn into_future(self) -> Self::Future {
-        WriteSessionFuture {
-            future: finchers::endpoint::with_get_cx(|input| self.raw.write(input)),
+        fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+            self.future
+                .poll()
+                .map_err(Into::into)
+                .map(|x| x.map(|raw| (Session { raw },)))
         }
     }
-}
 
-#[doc(hidden)]
-#[derive(Debug)]
-#[must_use = "futures do not anything unless polled."]
-pub struct WriteSessionFuture<F> {
-    future: F,
-}
+    /// A struct which manages the session value per request.
+    #[derive(Debug)]
+    pub struct Session<S: RawSession> {
+        raw: S,
+    }
 
-impl<F> Future for WriteSessionFuture<F>
-where
-    F: Future<Item = ()>,
-    F::Error: Into<Error>,
-{
-    type Item = ();
-    type Error = Error;
+    impl<S> Session<S>
+    where
+        S: RawSession,
+    {
+        /// Get the session value if available.
+        pub fn get(&self) -> Option<&str> {
+            self.raw.get()
+        }
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.future.poll().map_err(Into::into)
+        /// Set the session value.
+        pub fn set(&mut self, value: impl Into<String>) {
+            self.raw.set(value.into());
+        }
+
+        /// Annotates to remove session value to the backend.
+        pub fn remove(&mut self) {
+            self.raw.remove();
+        }
+    }
+
+    impl<S> IntoFuture for Session<S>
+    where
+        S: RawSession,
+    {
+        type Item = ();
+        type Error = Error;
+        type Future = WriteSessionFuture<S::WriteFuture>;
+
+        fn into_future(self) -> Self::Future {
+            WriteSessionFuture {
+                future: endpoint::with_get_cx(|input| self.raw.write(input)),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    #[must_use = "futures do not anything unless polled."]
+    pub struct WriteSessionFuture<F> {
+        future: F,
+    }
+
+    impl<F> Future for WriteSessionFuture<F>
+    where
+        F: Future<Item = ()>,
+        F::Error: Into<Error>,
+    {
+        type Item = ();
+        type Error = Error;
+
+        fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+            self.future.poll().map_err(Into::into)
+        }
     }
 }
