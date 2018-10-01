@@ -26,7 +26,7 @@ pub trait RawSession {
 }
 
 #[allow(missing_docs)]
-pub trait SessionBackend {
+pub trait Backend {
     type Session: RawSession;
     type ReadError: Into<Error>;
     type ReadFuture: Future<Item = Self::Session, Error = Self::ReadError>;
@@ -34,7 +34,7 @@ pub trait SessionBackend {
     fn read(&self, input: &mut Input) -> Self::ReadFuture;
 }
 
-impl<T: SessionBackend> SessionBackend for Box<T> {
+impl<T: Backend> Backend for Box<T> {
     type Session = T::Session;
     type ReadError = T::ReadError;
     type ReadFuture = T::ReadFuture;
@@ -45,7 +45,7 @@ impl<T: SessionBackend> SessionBackend for Box<T> {
     }
 }
 
-impl<T: SessionBackend> SessionBackend for Rc<T> {
+impl<T: Backend> Backend for Rc<T> {
     type Session = T::Session;
     type ReadError = T::ReadError;
     type ReadFuture = T::ReadFuture;
@@ -56,7 +56,7 @@ impl<T: SessionBackend> SessionBackend for Rc<T> {
     }
 }
 
-impl<T: SessionBackend> SessionBackend for Arc<T> {
+impl<T: Backend> Backend for Arc<T> {
     type Session = T::Session;
     type ReadError = T::ReadError;
     type ReadFuture = T::ReadFuture;
@@ -68,12 +68,12 @@ impl<T: SessionBackend> SessionBackend for Arc<T> {
 }
 
 /// Create a session backend which uses in-memory database.
-pub fn in_memory() -> self::in_memory::InMemorySessionBackend {
-    self::in_memory::InMemorySessionBackend::default()
+pub fn in_memory() -> self::in_memory::InMemoryBackend {
+    self::in_memory::InMemoryBackend::default()
 }
 
 /// Create a session backend which uses the specified Redis client.
 #[cfg(feature = "redis")]
-pub fn redis(client: ::redis::Client) -> self::redis::RedisSessionBackend {
-    self::redis::RedisSessionBackend::new(client)
+pub fn redis(client: ::redis::Client) -> self::redis::RedisBackend {
+    self::redis::RedisBackend::new(client)
 }

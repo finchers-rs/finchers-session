@@ -41,13 +41,13 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use backend::{RawSession, SessionBackend};
+use backend::{Backend, RawSession};
 
 /// Create an endpoint which extracts a session manager from the request.
 pub fn session<T, S>(backend: S) -> SessionEndpoint<T, S>
 where
     T: Serialize + DeserializeOwned,
-    S: SessionBackend,
+    S: Backend,
 {
     SessionEndpoint {
         backend,
@@ -65,7 +65,7 @@ pub struct SessionEndpoint<T, S> {
 impl<'a, T, S> Endpoint<'a> for SessionEndpoint<T, S>
 where
     T: Serialize + DeserializeOwned + 'a,
-    S: SessionBackend + 'a,
+    S: Backend + 'a,
 {
     type Output = (Session<T, S::Session>,);
     type Future = ReadSessionFuture<T, S::ReadFuture>;

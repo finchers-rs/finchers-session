@@ -9,7 +9,7 @@ use cookie::Cookie;
 use futures::future;
 use uuid::Uuid;
 
-use super::{RawSession, SessionBackend};
+use super::{Backend, RawSession};
 
 #[derive(Debug, Default)]
 struct Inner {
@@ -65,11 +65,11 @@ impl Inner {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct InMemorySessionBackend {
+pub struct InMemoryBackend {
     inner: Arc<Inner>,
 }
 
-impl SessionBackend for InMemorySessionBackend {
+impl Backend for InMemoryBackend {
     type Session = InMemorySession;
     type ReadError = Error;
     type ReadFuture = future::FutureResult<Self::Session, Self::ReadError>;

@@ -1,4 +1,4 @@
-pub use self::imp::{RedisSession, RedisSessionBackend};
+pub use self::imp::{RedisBackend, RedisSession};
 
 mod imp {
     use finchers;
@@ -19,7 +19,7 @@ mod imp {
     use futures::{Async, Future, Poll};
     use uuid::Uuid;
 
-    use backend::{RawSession, SessionBackend};
+    use backend::{Backend, RawSession};
 
     #[derive(Debug)]
     struct RedisSessionConfig {
@@ -47,15 +47,15 @@ mod imp {
 
     /// The instance of `SessionBackend` which uses Redis.
     #[derive(Debug, Clone)]
-    pub struct RedisSessionBackend {
+    pub struct RedisBackend {
         client: Client,
         config: Arc<RedisSessionConfig>,
     }
 
-    impl RedisSessionBackend {
+    impl RedisBackend {
         /// Create a new `RedisSessionBackend` from the specified Redis client.
-        pub fn new(client: Client) -> RedisSessionBackend {
-            RedisSessionBackend {
+        pub fn new(client: Client) -> RedisBackend {
+            RedisBackend {
                 client,
                 config: Arc::new(RedisSessionConfig {
                     key_prefix: "finchers-sesssion".into(),
@@ -73,7 +73,7 @@ mod imp {
         /// to Redis.
         ///
         /// The default value is "finchers-session"
-        pub fn key_prefix(mut self, prefix: impl Into<String>) -> RedisSessionBackend {
+        pub fn key_prefix(mut self, prefix: impl Into<String>) -> RedisBackend {
             self.config_mut().key_prefix = prefix.into();
             self
         }
@@ -81,19 +81,19 @@ mod imp {
         /// Set the name of Cookie entry which stores the session id.
         ///
         /// The default value is "session-id"
-        pub fn cookie_name(mut self, name: impl Into<Cow<'static, str>>) -> RedisSessionBackend {
+        pub fn cookie_name(mut self, name: impl Into<Cow<'static, str>>) -> RedisBackend {
             self.config_mut().cookie_name = name.into();
             self
         }
 
         /// Set the timeout of session value.
-        pub fn timeout(mut self, timeout: Duration) -> RedisSessionBackend {
+        pub fn timeout(mut self, timeout: Duration) -> RedisBackend {
             self.config_mut().timeout = Some(timeout);
             self
         }
     }
 
-    impl SessionBackend for RedisSessionBackend {
+    impl Backend for RedisBackend {
         type Session = RedisSession;
         type ReadError = Error;
         type ReadFuture = ReadFuture;

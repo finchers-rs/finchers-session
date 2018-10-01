@@ -8,7 +8,7 @@ use std::fmt;
 use std::sync::Arc;
 use time::Duration;
 
-use super::{RawSession, SessionBackend};
+use super::{Backend, RawSession};
 
 // TODOs:
 // * add support for setting whether to compress data
@@ -16,22 +16,22 @@ use super::{RawSession, SessionBackend};
 /// Create a `CookieSessionBackend` without signing and encryption.
 ///
 /// This function is equivalent to `CookieSessionBackend::plain()`.
-pub fn plain() -> CookieSessionBackend {
-    CookieSessionBackend::plain()
+pub fn plain() -> CookieBackend {
+    CookieBackend::plain()
 }
 
 /// Create a `CookieSessionBackend` with signing.
 ///
 /// This function is equivalent to `CookieSessionBackend::signed(Key::from_master(key.as_ref()))`.
-pub fn signed(master: impl AsRef<[u8]>) -> CookieSessionBackend {
-    CookieSessionBackend::signed(Key::from_master(master.as_ref()))
+pub fn signed(master: impl AsRef<[u8]>) -> CookieBackend {
+    CookieBackend::signed(Key::from_master(master.as_ref()))
 }
 
 /// Create a `CookieSessionBackend` with encryption.
 ///
 /// This function is equivalent to `CookieSessionBackend::private(Key::from_master(key.as_ref()))`.
-pub fn private(master: impl AsRef<[u8]>) -> CookieSessionBackend {
-    CookieSessionBackend::private(Key::from_master(master.as_ref()))
+pub fn private(master: impl AsRef<[u8]>) -> CookieBackend {
+    CookieBackend::private(Key::from_master(master.as_ref()))
 }
 
 trait BuilderExt: Sized {
@@ -63,7 +63,7 @@ impl fmt::Debug for Security {
 }
 
 #[derive(Debug)]
-struct CookieSessionConfig {
+struct CookieConfig {
     security: Security,
     name: String,
     path: Cow<'static, str>,
@@ -74,7 +74,7 @@ struct CookieSessionConfig {
     max_age: Option<Duration>,
 }
 
-impl CookieSessionConfig {
+impl CookieConfig {
     fn read_value(&self, input: &mut Input) -> Result<Option<String>, Error> {
         let jar = input.cookies()?;
         let cookie = match self.security {
@@ -122,14 +122,14 @@ impl CookieSessionConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct CookieSessionBackend {
-    config: Arc<CookieSessionConfig>,
+pub struct CookieBackend {
+    config: Arc<CookieConfig>,
 }
 
-impl CookieSessionBackend {
-    fn new(security: Security) -> CookieSessionBackend {
-        CookieSessionBackend {
-            config: Arc::new(CookieSessionConfig {
+impl CookieBackend {
+    fn new(security: Security) -> CookieBackend {
+        CookieBackend {
+            config: Arc::new(CookieConfig {
                 security,
                 name: "finchers-session".into(),
                 path: "/".into(),
@@ -143,28 +143,28 @@ impl CookieSessionBackend {
     }
 
     /// Creates a `CookieSessionBackend` which stores the Cookie values as a raw form.
-    pub fn plain() -> CookieSessionBackend {
-        CookieSessionBackend::new(Security::Plain)
+    pub fn plain() -> CookieBackend {
+        CookieBackend::new(Security::Plain)
     }
 
     /// Creates a `CookieSessionBackend` which signs the Cookie values with the specified secret key.
-    pub fn signed(key: Key) -> CookieSessionBackend {
-        CookieSessionBackend::new(Security::Signed(key))
+    pub fn signed(key: Key) -> CookieBackend {
+        CookieBackend::new(Security::Signed(key))
     }
 
     /// Creates a `CookieSessionBackend` which encrypts the Cookie values with the specified secret key.
-    pub fn private(key: Key) -> CookieSessionBackend {
-        CookieSessionBackend::new(Security::Private(key))
+    pub fn private(key: Key) -> CookieBackend {
+        CookieBackend::new(Security::Private(key))
     }
 
-    fn config_mut(&mut self) -> &mut CookieSessionConfig {
+    fn config_mut(&mut self) -> &mut CookieConfig {
         Arc::get_mut(&mut self.config).expect("The instance has already shared.")
     }
 
     /// Sets the path of Cookie entry.
     ///
     /// The default value is `"/"`.
-    pub fn path(mut self, value: impl Into<Cow<'static, str>>) -> CookieSessionBackend {
+    pub fn path(mut self, value: impl Into<Cow<'static, str>>) -> CookieBackend {
         self.config_mut().path = value.into();
         self
     }
@@ -172,7 +172,7 @@ impl CookieSessionBackend {
     /// Sets the value of `secure` in Cookie entry.
     ///
     /// The default value is `true`.
-    pub fn secure(mut self, value: bool) -> CookieSessionBackend {
+    pub fn secure(mut self, value: bool) -> CookieBackend {
         self.config_mut().secure = value;
         self
     }
@@ -180,7 +180,7 @@ impl CookieSessionBackend {
     /// Sets the value of `http_only` in Cookie entry.
     ///
     /// The default value is `true`.
-    pub fn http_only(mut self, value: bool) -> CookieSessionBackend {
+    pub fn http_only(mut self, value: bool) -> CookieBackend {
         self.config_mut().http_only = value;
         self
     }
@@ -188,7 +188,7 @@ impl CookieSessionBackend {
     /// Sets the value of `domain` in Cookie entry.
     ///
     /// The default value is `None`.
-    pub fn domain(mut self, value: impl Into<Cow<'static, str>>) -> CookieSessionBackend {
+    pub fn domain(mut self, value: impl Into<Cow<'static, str>>) -> CookieBackend {
         self.config_mut().domain = Some(value.into());
         self
     }
@@ -196,7 +196,7 @@ impl CookieSessionBackend {
     /// Sets the value of `same_site` in Cookie entry.
     ///
     /// The default value is `None`.
-    pub fn same_site(mut self, value: SameSite) -> CookieSessionBackend {
+    pub fn same_site(mut self, value: SameSite) -> CookieBackend {
         self.config_mut().same_site = Some(value);
         self
     }
@@ -204,13 +204,13 @@ impl CookieSessionBackend {
     /// Sets the value of `max_age` in Cookie entry.
     ///
     /// The default value is `None`.
-    pub fn max_age(mut self, value: Duration) -> CookieSessionBackend {
+    pub fn max_age(mut self, value: Duration) -> CookieBackend {
         self.config_mut().max_age = Some(value);
         self
     }
 }
 
-impl SessionBackend for CookieSessionBackend {
+impl Backend for CookieBackend {
     type Session = CookieSession;
     type ReadError = Error;
     type ReadFuture = future::FutureResult<Self::Session, Self::ReadError>;
@@ -225,7 +225,7 @@ impl SessionBackend for CookieSessionBackend {
 
 #[derive(Debug)]
 pub struct CookieSession {
-    config: Arc<CookieSessionConfig>,
+    config: Arc<CookieConfig>,
     value: Option<String>,
 }
 
