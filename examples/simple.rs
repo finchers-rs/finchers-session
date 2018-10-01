@@ -9,7 +9,6 @@ extern crate pretty_env_logger;
 extern crate serde;
 extern crate serde_json;
 
-use finchers::error::Error;
 use finchers::prelude::*;
 
 use http::Response;
@@ -39,15 +38,20 @@ fn main() {
     let session = finchers_session::session(backend);
 
     let endpoint = path!(@get /).and(session).and_then(|session: Session| {
-        session.with(|session| -> Result<_, Error> {
+        session.with(|session| {
             // Retrieve the value of session.
             //
             // Note that the session value are stored as a UTF-8 string,
             // which means that the user it is necessary for the user to
             // deserialize/serialize the session data.
             let mut session_value: SessionValue = {
-                let s = session.get().unwrap_or("");
-                serde_json::from_str(s).map_err(finchers::error::bad_request)?
+                let s = session.get().unwrap_or(r#"{ "text": "" }"#);
+                serde_json::from_str(s).map_err(|err| {
+                    finchers::error::bad_request(format!(
+                        "failed to parse session value (input = {:?}): {}",
+                        s, err
+                    ))
+                })?
             };
 
             let response = Response::builder()

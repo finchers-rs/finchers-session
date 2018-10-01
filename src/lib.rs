@@ -122,12 +122,10 @@ mod imp {
             f: impl FnOnce(&mut Self) -> R,
         ) -> impl Future<Item = R::Item, Error = Error>
         where
-            R: IntoFuture,
-            Error: From<R::Error>,
+            R: IntoFuture<Error = Error>,
         {
             f(&mut self)
                 .into_future()
-                .from_err()
                 .and_then(move |item| self.into_future().map(move |()| item))
         }
     }
