@@ -11,12 +11,20 @@ branches:
     - master
     - /^\d+\.\d+\.x$/
 
+script:
+  - cargo update
+  - cargo build
+
 matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
 
   include:
+    - rust: 1.29.1
+    - rust: beta
+    - rust: nightly
+
     - rust: stable
       sudo: required
       addons:
@@ -27,36 +35,21 @@ matrix:
             - libdw-dev
             - binutils-dev
       before_script:
-        - rustup component add rustfmt-preview
+        - rustup component add rustfmt-preview clippy-preview
         - cargo install cargo-update || true
         - cargo install cargo-kcov || true
         - cargo install-update -a
-        - export CARGO_INCREMENTAL=0
       script:
         - cargo update
-        - cargo test --features "redis secure strict"
-        - cargo test --no-default-features --features "strict"
+        - cargo test
+        - cargo test --all-features
+        - cargo test --no-default-features
         - cargo fmt -- --check
+        - cargo clippy
         - if [[ "${TRAVIS_PULL_REQUEST_BRANCH:-}" = release-* ]]; then cargo package; fi
       after_success:
         - cargo kcov --print-install-kcov-sh | sh
         - cargo kcov -v --coveralls
-
-    - rust: beta
-      before_script:
-        - export CARGO_INCREMENTAL=0
-      script:
-        - cargo update
-        - cargo test --features "redis secure strict"
-        - cargo test --no-default-features --features "strict"
-
-    - rust: nightly
-      before_script:
-        - export CARGO_INCREMENTAL=0
-      script:
-        - cargo update
-        - cargo test --features "redis secure"
-        - cargo test --no-default-features
 
     - rust: stable
       env: DEPLOY_API_DOC
@@ -64,7 +57,8 @@ matrix:
       script:
         - rm -rf target/doc
         - cargo update
-        - cargo doc --features "secure redis" --no-deps
+        - cargo doc --all-features --no-deps -p redis
+        - cargo doc --all-features --no-deps
         - rm -f target/doc/.lock
         - echo '<meta http-equiv="refresh" content="0;URL=finchers_session/index.html">' > target/doc/index.html
       deploy:
