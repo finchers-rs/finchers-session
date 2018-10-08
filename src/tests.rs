@@ -1,9 +1,10 @@
 use finchers::error::Error;
 use finchers::input::Input;
-use finchers::local;
 use finchers::prelude::*;
+use finchers::test;
 
 use futures::future;
+use http::Request;
 
 use session::{RawSession, Session};
 
@@ -63,26 +64,30 @@ impl RawSession for MockSession {
 fn test_session_with() {
     let call_chain = Rc::new(CallChain::default());
 
-    let session_endpoint = endpoint::apply_fn({
-        let call_chain = call_chain.clone();
-        move |_cx| {
-            Ok(Ok((Session::new(MockSession {
-                call_chain: call_chain.clone(),
-            }),)))
-        }
-    });
-    let endpoint = session_endpoint.and_then(|session: Session<MockSession>| {
-        session.with(|session| {
-            session.get();
-            session.set("foo");
-            session.remove();
-            Ok("done")
-        })
+    let mut runner = test::runner({
+        let session_endpoint = endpoint::apply({
+            let call_chain = call_chain.clone();
+            move |_cx| {
+                Ok(Ok(Session::new(MockSession {
+                    call_chain: call_chain.clone(),
+                })))
+            }
+        });
+        let endpoint = session_endpoint.and_then(|session: Session<MockSession>| {
+            session.with(|session| {
+                session.get();
+                session.set("foo");
+                session.remove();
+                Ok("done")
+            })
+        });
+
+        endpoint
     });
 
-    let response = local::get("/")
-        .header("host", "localhost:3000")
-        .respond(&endpoint);
+    let response = runner
+        .perform(Request::get("/").header("host", "localhost:3000"))
+        .unwrap();
     assert!(!response.headers().contains_key("set-cookie"));
 
     assert_eq!(

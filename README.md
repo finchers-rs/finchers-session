@@ -1,7 +1,8 @@
 # `finchers-session`
 
 [![crates.io](https://img.shields.io/crates/v/finchers-session.svg)](https://crates.io/crates/finchers-session)
-[![API documentation](https://img.shields.io/badge/api-docs-blue.svg)](https://finchers-rs.github.io/docs)
+[![Docs.rs](https://docs.rs/finchers-session/badge.svg)](https://docs.rs/finchers-session)
+[![dependency status](https://deps.rs/crate/finchers-session/0.1.0/status.svg)](https://deps.rs/crate/finchers-session/0.1.0)
 [![Build Status](https://travis-ci.org/finchers-rs/finchers-session.svg?branch=master)](https://travis-ci.org/finchers-rs/finchers-session)
 [![Coverage Status](https://coveralls.io/repos/github/finchers-rs/finchers-session/badge.svg?branch=master)](https://coveralls.io/github/finchers-rs/finchers-session?branch=master)
 

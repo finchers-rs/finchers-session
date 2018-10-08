@@ -25,7 +25,7 @@
 //! #           Ok("done")
 //!         })
 //!     });
-//! # drop(move || finchers::launch(endpoint).start("127.0.0.1:4000"));
+//! # drop(move || finchers::server::start(endpoint).serve("127.0.0.1:4000"));
 //! # }
 //! ```
 

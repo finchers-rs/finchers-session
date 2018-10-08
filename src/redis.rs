@@ -32,7 +32,7 @@
 //! #           Ok("done")
 //!         })
 //!     });
-//! # finchers::launch(endpoint).start("127.0.0.1:4000");
+//! # finchers::server::start(endpoint).serve("127.0.0.1:4000")
 //! # });
 //! # }
 //! ```
