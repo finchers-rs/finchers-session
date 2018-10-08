@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["cookie","The session backend using Cookie as a session storage."],["in_memory","The session backend using in-memory database."],["redis","The session backend using Redis."]],"struct":[["Session","A struct which manages the session value per request."]],"trait":[["RawSession","The trait representing the backend to manage session value."]]});

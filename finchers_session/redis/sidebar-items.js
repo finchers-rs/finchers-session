@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RedisBackend","The instance of `SessionBackend` which uses Redis."],["RedisSession",""]]});

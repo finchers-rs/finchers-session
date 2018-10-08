@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["plain","Create a `CookieSessionBackend` without signing and encryption."],["private","Create a `CookieSessionBackend` with encryption (requires `feature = \"secure\"`)."],["signed","Create a `CookieSessionBackend` with signing (requires `feature = \"secure\"`)."]],"struct":[["CookieBackend",""],["CookieSession",""]]});
